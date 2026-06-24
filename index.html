@@ -322,6 +322,90 @@
       margin-top: 6px;
     }
 
+    /* ── Daily rates chart ─────────────────────────────────────────── */
+    .chart-wrap {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      padding: 18px 18px 14px;
+      margin-bottom: 36px;
+      position: relative;
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      margin-bottom: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .chart-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chart-legend .legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .chart-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .daily-chart {
+      display: block;
+      touch-action: pan-y;
+    }
+
+    .daily-chart .bar {
+      cursor: pointer;
+      transition: opacity 0.12s;
+    }
+
+    .daily-chart .bar:hover,
+    .daily-chart .bar.active {
+      opacity: 0.75;
+    }
+
+    .daily-chart .axis-line {
+      stroke: var(--border);
+      stroke-width: 1;
+    }
+
+    .daily-chart .axis-label {
+      fill: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+
+    .chart-tooltip {
+      position: absolute;
+      background: var(--surface2);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text);
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 5;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+
+    .chart-tooltip .tt-date { color: var(--muted); font-size: 0.68rem; margin-bottom: 2px; }
+    .chart-tooltip .tt-price { color: var(--accent); font-weight: 500; }
+
     /* Full data table */
     .table-wrap {
       overflow-x: auto;
@@ -443,6 +527,30 @@
       margin-bottom: 48px;
     }
 
+    .hm-legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .hm-legend-bar {
+      width: 140px;
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(to right,
+        rgb(96,212,240) 0%,
+        rgb(74,222,128) 25%,
+        rgb(200,240,100) 50%,
+        rgb(251,146,60) 75%,
+        rgb(248,113,113) 100%);
+    }
+
     .heatmap-table {
       width: 100%;
       border-collapse: collapse;
@@ -461,10 +569,17 @@
       background: var(--surface2);
     }
 
+    /* Sticky first column ("Day") so it stays visible while the rest of the
+       table scrolls horizontally on mobile. */
     .heatmap-table th.day-header {
       text-align: left;
       padding-left: 20px;
       min-width: 60px;
+      position: sticky;
+      left: 0;
+      z-index: 3;
+      background: var(--surface2);
+      box-shadow: 2px 0 4px rgba(0,0,0,0.25);
     }
 
     .heatmap-table td {
@@ -489,21 +604,28 @@
       background: var(--surface2);
       border-right: 1px solid var(--border);
       min-width: 60px;
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      box-shadow: 2px 0 4px rgba(0,0,0,0.25);
     }
 
     .heatmap-table td.day-label.weekend { color: var(--accent2); }
 
     .heatmap-table td:last-child { border-right: none; }
     .heatmap-table tr:last-child td { border-bottom: none; }
-    .heatmap-table tbody tr:hover td:not(.day-label) { background: var(--surface); }
+    /* Hover highlight is skipped on the sticky day-label column itself so the
+       heatmap cell colours remain the visual focus. */
+    .heatmap-table tbody tr:hover td:not(.day-label):not(.hm-cell):not(.row-avg-val) { background: var(--surface); }
 
-    .hm-cell { color: var(--accent); font-weight: 500; cursor: default; }
+    /* Heatmap cells now use a background-colour gradient (set inline via JS,
+       interpolated by price percentile) rather than text-colour-only buckets,
+       so the price range reads clearly at a glance. Text colour switches
+       between dark/light automatically for contrast against the fill. */
+    .hm-cell { font-weight: 500; cursor: default; }
+    .hm-cell.hm-text-dark { color: #0e0f11; }
+    .hm-cell.hm-text-light { color: #f3f5f8; }
     .hm-null  { color: rgba(107,114,128,0.4); }
-    .hm-hot   { color: #f87171; }   /* top ~20% prices */
-    .hm-warm  { color: #fb923c; }   /* top 20-40% */
-    .hm-mid   { color: var(--accent); }  /* middle */
-    .hm-cool  { color: #4ade80; }   /* bottom 20-40% */
-    .hm-cold  { color: #60d4f0; }   /* bottom ~20% prices */
 
     .hm-avg-row td {
       background: var(--surface2);
@@ -512,6 +634,7 @@
       border-top: 1px solid var(--border);
     }
     .hm-avg-row td.avg-val { color: var(--accent2); font-weight: 500; }
+    .hm-avg-row td.day-label { background: var(--surface2); }
 
     /* Row average column in heatmap */
     .heatmap-table td.row-avg-val {
@@ -592,6 +715,10 @@
       border-radius: 6px;
       padding: 3px 8px;
     }
+    #fxGoogleFinanceLink:hover { color: var(--accent); border-color: var(--accent); }
+    #fxRateStatus.fx-loading { color: var(--accent2); }
+    #fxRateStatus.fx-error { color: var(--danger); }
+    #fxRateStatus.fx-ok { color: var(--success); }
   </style>
 </head>
 <body>
@@ -698,19 +825,18 @@
       </label>
       <div class="fx-fields" id="fxFields" style="display:none;">
         <span class="fx-sep">Convert all prices → </span>
-        <div class="field" style="min-width:80px;">
-          <input type="text" id="fxTargetSymbol" placeholder="¥" value="¥" style="width:60px;padding:8px 10px;text-align:center;" title="Display symbol" />
-        </div>
-        <div class="field" style="min-width:100px;">
-          <input type="text" id="fxTargetLabel" placeholder="JPY" value="JPY" style="width:80px;padding:8px 10px;text-align:center;font-family:var(--font-mono);" title="Currency label" />
-        </div>
+        <select id="fxTargetCurrency" onchange="onFxTargetChange()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.82rem;font-family:var(--font-mono);cursor:pointer;">
+          <!-- options injected by JS from the same CURRENCY_LIST used for 'Not right?' -->
+        </select>
         <span class="fx-sep">at rate</span>
         <span class="fx-sep" id="fxSourceLabel" style="color:var(--accent);font-family:var(--font-mono);">1 USD</span>
         <span class="fx-sep">=</span>
         <div class="field" style="min-width:100px;">
-          <input type="number" id="fxRate" placeholder="155.00" value="155" min="0.0001" step="any" style="width:100px;padding:8px 10px;" title="FX rate (units of target per 1 source)" />
+          <input type="number" id="fxRate" placeholder="155.00" value="155" min="0.0001" step="any" style="width:100px;padding:8px 10px;" title="FX rate (units of target per 1 source). Auto-filled when available — edit to override." />
         </div>
         <span id="fxTargetLabelBadge" class="fx-badge">JPY</span>
+        <span id="fxRateStatus" style="font-size:0.72rem;color:var(--muted);"></span>
+        <a id="fxGoogleFinanceLink" href="#" target="_blank" rel="noopener" style="font-size:0.72rem;color:var(--accent2);text-decoration:none;border-bottom:1px dotted var(--accent2);">Check on Google Finance ↗</a>
       </div>
       <span id="fxOffNote" style="font-size:0.78rem;color:var(--muted);">Off — prices displayed in scraped currency</span>
     </div>
@@ -736,16 +862,28 @@
     <div class="stats-row" id="statsRow"></div>
 
     <div class="results-header">
-      <h2 class="section-title">Monthly <span>Averages</span></h2>
+      <h2 class="section-title">Daily <span>Rates</span></h2>
       <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
     </div>
 
-    <div class="monthly-grid" id="monthlyGrid"></div>
+    <div class="chart-wrap" id="chartWrap">
+      <div class="chart-legend" id="chartLegend"></div>
+      <div class="chart-scroll" id="chartScroll">
+        <svg id="dailyChart" class="daily-chart"></svg>
+      </div>
+      <div class="chart-tooltip" id="chartTooltip" style="display:none;"></div>
+    </div>
 
-    <h2 class="section-title" style="margin-bottom:16px;">Day-of-Week <span>Price Matrix</span></h2>
+    <h2 class="section-title" style="margin-bottom:10px;">Day-of-Week <span>Price Matrix</span></h2>
+    <div class="hm-legend">
+      <span>Cheaper</span>
+      <span class="hm-legend-bar"></span>
+      <span>Pricier</span>
+    </div>
     <div class="heatmap-wrap">
       <div id="heatmapTable"></div>
     </div>
+
 
     <h2 class="section-title" style="margin-bottom:16px;">Full <span>Night-by-Night</span> Rates</h2>
     <div class="table-wrap">
@@ -867,7 +1005,19 @@
     confirmedCurrency = { currency, symbol, gl };
     document.getElementById('currencyDisplay').textContent =
       `${currency} (${symbol}) · ${gl.toUpperCase()} pricing`;
+    // Source currency changed — refresh the FX rate against the new source.
+    updateFxSourceLabel();
+    if (document.getElementById('fxEnabled').checked) loadFxRate();
   }
+
+  // Reuse the same currency list that powers the "Not right?" dropdown so
+  // the FX target dropdown never drifts out of sync with it.
+  const CURRENCY_LIST = Array.from(document.getElementById('currencyOverride').options)
+    .filter(o => o.value)
+    .map(o => {
+      const [code, symbol] = o.value.split(',');
+      return { code, symbol, label: o.textContent };
+    });
 
   // ── Date / month helpers ─────────────────────────────────────────────────
   const today = new Date();
@@ -962,11 +1112,36 @@
   let globalData = null;
 
   // ── FX Conversion ────────────────────────────────────────────────────────
+  // Target currency dropdown is populated from the same CURRENCY_LIST as the
+  // "Not right?" override, so the unit/symbol always auto-loads correctly
+  // (e.g. picking JPY loads ¥ / JPY) instead of relying on free-text fields.
+  (function populateFxTargetSelect() {
+    const sel = document.getElementById('fxTargetCurrency');
+    sel.innerHTML = CURRENCY_LIST.map(c =>
+      `<option value="${c.code},${c.symbol}">${c.label}</option>`
+    ).join('');
+    // Default target to JPY if present, else first in list.
+    const jpy = CURRENCY_LIST.findIndex(c => c.code === 'JPY');
+    sel.selectedIndex = jpy >= 0 ? jpy : 0;
+  })();
+
+  // Currencies the free Frankfurter/ECB rate feed does not cover — for these
+  // we leave the rate field editable and point the person to Google Finance.
+  const FX_RATE_UNSUPPORTED = new Set(['AED', 'QAR', 'SAR', 'TWD', 'VND', 'MAD']);
+
+  const fxRateCache = {}; // "FROM_TO" -> rate, to avoid refetching on every toggle
+
   function onFxToggle() {
     const enabled = document.getElementById('fxEnabled').checked;
     document.getElementById('fxFields').style.display = enabled ? 'flex' : 'none';
     document.getElementById('fxOffNote').style.display = enabled ? 'none' : 'inline';
     updateFxSourceLabel();
+    if (enabled) loadFxRate();
+  }
+
+  function onFxTargetChange() {
+    updateFxSourceLabel();
+    loadFxRate();
   }
 
   function updateFxSourceLabel() {
@@ -974,26 +1149,81 @@
     const currency = confirmedCurrency || detectedCurrency;
     const el = document.getElementById('fxSourceLabel');
     if (el) el.textContent = `1 ${currency.currency}`;
-    // Also update the target badge
+    // Auto-load the target badge from the selected dropdown option (e.g. ¥ / JPY)
+    const sel = document.getElementById('fxTargetCurrency');
     const badge = document.getElementById('fxTargetLabelBadge');
-    const targetLabel = document.getElementById('fxTargetLabel');
-    if (badge && targetLabel) badge.textContent = targetLabel.value || 'JPY';
+    if (sel && badge && sel.value) {
+      const [code] = sel.value.split(',');
+      badge.textContent = code;
+    }
+    const link = document.getElementById('fxGoogleFinanceLink');
+    if (link && sel && sel.value) {
+      const [targetCode] = sel.value.split(',');
+      link.href = `https://www.google.com/finance/quote/${currency.currency}-${targetCode}`;
+    }
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const tl = document.getElementById('fxTargetLabel');
-    const tb = document.getElementById('fxTargetLabelBadge');
-    if (tl && tb) tl.addEventListener('input', () => { tb.textContent = tl.value || '—'; });
-  });
+  function setFxStatus(msg, kind) {
+    const el = document.getElementById('fxRateStatus');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = kind ? `fx-${kind}` : '';
+  }
+
+  async function loadFxRate() {
+    const sel = document.getElementById('fxTargetCurrency');
+    if (!sel || !sel.value) return;
+    const [targetCode] = sel.value.split(',');
+    const source = confirmedCurrency || detectedCurrency;
+    const sourceCode = source.currency;
+    const rateInput = document.getElementById('fxRate');
+
+    updateFxSourceLabel();
+
+    if (sourceCode === targetCode) {
+      rateInput.value = 1;
+      setFxStatus('Same currency — rate fixed at 1', 'ok');
+      return;
+    }
+
+    if (FX_RATE_UNSUPPORTED.has(sourceCode) || FX_RATE_UNSUPPORTED.has(targetCode)) {
+      setFxStatus('Rate not available for this pair — enter manually, verify on Google Finance', 'error');
+      return;
+    }
+
+    const cacheKey = `${sourceCode}_${targetCode}`;
+    if (fxRateCache[cacheKey]) {
+      rateInput.value = fxRateCache[cacheKey];
+      setFxStatus(`Auto-loaded · 1 ${sourceCode} = ${fxRateCache[cacheKey]} ${targetCode}`, 'ok');
+      return;
+    }
+
+    setFxStatus('Loading rate…', 'loading');
+    try {
+      const resp = await fetch(`https://api.frankfurter.dev/v1/latest?base=${sourceCode}&symbols=${targetCode}`);
+      if (!resp.ok) throw new Error('rate fetch failed');
+      const data = await resp.json();
+      const rate = data.rates && data.rates[targetCode];
+      if (!rate) throw new Error('rate not in response');
+      const rounded = rate >= 100 ? Math.round(rate * 100) / 100 : Math.round(rate * 10000) / 10000;
+      fxRateCache[cacheKey] = rounded;
+      rateInput.value = rounded;
+      setFxStatus(`Auto-loaded · 1 ${sourceCode} = ${rounded} ${targetCode}`, 'ok');
+    } catch (err) {
+      setFxStatus('Could not auto-load rate — enter manually, verify on Google Finance', 'error');
+    }
+  }
 
   function getFxConfig() {
     if (!document.getElementById('fxEnabled').checked) return null;
     const rate = parseFloat(document.getElementById('fxRate').value);
     if (!rate || rate <= 0) return null;
+    const sel = document.getElementById('fxTargetCurrency');
+    const [code, symbol] = (sel.value || 'JPY,¥').split(',');
     return {
       rate,
-      symbol: document.getElementById('fxTargetSymbol').value || '¥',
-      label: document.getElementById('fxTargetLabel').value || 'JPY',
+      symbol: symbol || '¥',
+      label: code || 'JPY',
     };
   }
 
@@ -1058,8 +1288,10 @@
       setStatus('End date must be after start date.', true); return;
     }
 
-    // Update FX source label to match confirmed currency
+    // Update FX source label to match confirmed currency, and refresh the
+    // auto-loaded rate in case the source currency changed (e.g. new hotel).
     updateFxSourceLabel();
+    if (document.getElementById('fxEnabled').checked) await loadFxRate();
 
     document.getElementById('runBtn').disabled = true;
     document.getElementById('results').style.display = 'none';
@@ -1131,15 +1363,9 @@
       </div>
     `;
 
-    const monthlyHtml = Object.entries(stats.monthly).map(([month, m]) => `
-      <div class="month-card">
-        <div class="month-name">${month}</div>
-        <div class="month-avg">${sym}${m.average.toLocaleString()}</div>
-        <div class="month-range">${sym}${m.min.toLocaleString()} – ${sym}${m.max.toLocaleString()} · ${m.count} nights</div>
-      </div>
-    `).join('');
-    document.getElementById('monthlyGrid').innerHTML = monthlyHtml ||
-      '<p style="color:var(--muted);font-size:0.85rem;">No price data returned.</p>';
+    // Render daily rates chart (replaces the old monthly-average cards —
+    // that summary is still visible per-row in the table below).
+    renderDailyChart(priceResults, sym);
 
     const maxPrice = priceResults.length ? Math.max(...priceResults.map(r=>r.price)) : 1;
     let lastMonth = null;
@@ -1181,6 +1407,154 @@
       document.getElementById('debugPanel').style.display = 'block';
       document.getElementById('debugLog').textContent = data.debug.join('\n');
     }
+  }
+
+  // ── Daily rates chart (bar per night, coloured by month) ────────────────
+  const CHART_MONTH_COLOURS = [
+    '#c8f064', '#64d4f0', '#f0a8e8', '#f5b942', '#7c9cf0',
+    '#4ade80', '#f87171', '#c084fc', '#5eead4', '#fb923c',
+    '#a3e635', '#60a5fa',
+  ];
+
+  let chartActiveBar = null;
+
+  // Single persistent listener (set up once) to dismiss the tooltip when
+  // tapping/clicking outside the chart — avoids re-registering on every render.
+  document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('chartWrap');
+    const tooltip = document.getElementById('chartTooltip');
+    if (wrap && tooltip && !wrap.contains(e.target)) {
+      tooltip.style.display = 'none';
+      if (chartActiveBar) { chartActiveBar.classList.remove('active'); chartActiveBar = null; }
+    }
+  });
+
+  function renderDailyChart(priceResults, sym) {
+    const wrap = document.getElementById('chartWrap');
+    const svg = document.getElementById('dailyChart');
+    const legend = document.getElementById('chartLegend');
+    const tooltip = document.getElementById('chartTooltip');
+    tooltip.style.display = 'none';
+    chartActiveBar = null;
+
+    if (!priceResults.length) {
+      legend.innerHTML = '';
+      svg.innerHTML = '';
+      svg.setAttribute('width', 0);
+      svg.setAttribute('height', 0);
+      let emptyMsg = wrap.querySelector('.chart-empty-msg');
+      if (!emptyMsg) {
+        emptyMsg = document.createElement('p');
+        emptyMsg.className = 'chart-empty-msg';
+        emptyMsg.style.cssText = 'color:var(--muted);font-size:0.85rem;padding:8px 2px;';
+        wrap.querySelector('.chart-scroll').appendChild(emptyMsg);
+      }
+      emptyMsg.textContent = 'No price data returned.';
+      emptyMsg.style.display = 'block';
+      return;
+    }
+
+    // Clear any previous "no data" message now that we have data to show
+    const existingEmptyMsg = wrap.querySelector('.chart-empty-msg');
+    if (existingEmptyMsg) existingEmptyMsg.style.display = 'none';
+
+    // Assign a colour per month in chronological order of first appearance
+    const months = [];
+    const seenMonths = new Set();
+    for (const r of priceResults) {
+      if (!seenMonths.has(r.month)) { seenMonths.add(r.month); months.push(r.month); }
+    }
+    const monthColour = {};
+    months.forEach((m, i) => { monthColour[m] = CHART_MONTH_COLOURS[i % CHART_MONTH_COLOURS.length]; });
+
+    // Legend
+    legend.innerHTML = months.map(m =>
+      `<span class="legend-item"><span class="legend-swatch" style="background:${monthColour[m]}"></span>${m}</span>`
+    ).join('');
+
+    // Layout
+    const barW = 14, gap = 4, leftPad = 44, rightPad = 10, topPad = 14, bottomPad = 22;
+    const chartH = 200;
+    const n = priceResults.length;
+    const innerW = n * (barW + gap);
+    const totalW = leftPad + innerW + rightPad;
+    const totalH = topPad + chartH + bottomPad;
+
+    const maxPrice = Math.max(...priceResults.map(r => r.price));
+    const yMax = maxPrice * 1.05;
+
+    svg.setAttribute('width', totalW);
+    svg.setAttribute('height', totalH);
+    svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+
+    const yScale = v => topPad + chartH - (v / yMax) * chartH;
+
+    // Y-axis gridlines + labels (4 bands)
+    let axisSvg = '';
+    const ticks = 4;
+    for (let i = 0; i <= ticks; i++) {
+      const val = (yMax / ticks) * i;
+      const y = yScale(val);
+      axisSvg += `<line class="axis-line" x1="${leftPad}" y1="${y}" x2="${totalW - rightPad}" y2="${y}" />`;
+      axisSvg += `<text class="axis-label" x="${leftPad - 8}" y="${y + 3}" text-anchor="end">${sym}${Math.round(val).toLocaleString()}</text>`;
+    }
+
+    // Bars — one per night with price data
+    let barsSvg = '';
+    priceResults.forEach((r, i) => {
+      const x = leftPad + i * (barW + gap);
+      const y = yScale(r.price);
+      const h = (topPad + chartH) - y;
+      const colour = monthColour[r.month];
+      barsSvg += `<rect class="bar" data-idx="${i}" x="${x}" y="${y}" width="${barW}" height="${Math.max(h,1)}" rx="2" fill="${colour}" />`;
+    });
+
+    // Month boundary tick labels along x-axis (first day of each visible month)
+    let lastMonthLabel = null;
+    priceResults.forEach((r, i) => {
+      if (r.month !== lastMonthLabel) {
+        lastMonthLabel = r.month;
+        const x = leftPad + i * (barW + gap);
+        const shortLabel = r.month.split(' ')[0].slice(0, 3);
+        axisSvg += `<line class="axis-line" x1="${x}" y1="${topPad}" x2="${x}" y2="${topPad + chartH}" />`;
+        axisSvg += `<text class="axis-label" x="${x + 2}" y="${topPad + chartH + 14}">${shortLabel}</text>`;
+      }
+    });
+
+    svg.innerHTML = axisSvg + barsSvg;
+
+    // Tap / click / hover → tooltip with date + rate
+    function showTooltip(idx, clientX, clientY) {
+      const r = priceResults[idx];
+      if (!r) return;
+      tooltip.innerHTML = `<div class="tt-date">${r.date} · ${r.day_of_week}</div><div class="tt-price">${sym}${r.price.toLocaleString()}</div>`;
+      tooltip.style.display = 'block';
+      const wrapRect = wrap.getBoundingClientRect();
+      let left = clientX - wrapRect.left + 10;
+      let top = clientY - wrapRect.top - 40;
+      // Keep tooltip inside the card horizontally
+      const ttWidth = 140;
+      if (left + ttWidth > wrap.clientWidth) left = wrap.clientWidth - ttWidth - 6;
+      if (left < 0) left = 6;
+      if (top < 0) top = clientY - wrapRect.top + 16;
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+    }
+
+    function onBarInteract(e) {
+      const target = e.target.closest('.bar');
+      if (!target) return;
+      if (chartActiveBar) chartActiveBar.classList.remove('active');
+      target.classList.add('active');
+      chartActiveBar = target;
+      const idx = parseInt(target.getAttribute('data-idx'), 10);
+      const point = e.touches ? e.touches[0] : e;
+      showTooltip(idx, point.clientX, point.clientY);
+      e.stopPropagation();
+    }
+
+    svg.onclick = onBarInteract;
+    svg.ontouchstart = onBarInteract;
   }
 
   // ── Day × Month heatmap ─────────────────────────────────────────────────
@@ -1235,17 +1609,47 @@
         : null;
     }
 
-    // Percentile colour buckets
+    // Continuous colour gradient by price percentile (cool/cheap → hot/expensive)
+    // instead of discrete buckets, so the price range reads at a glance.
     allAvgs.sort((a,b) => a-b);
-    function colourClass(val) {
-      if (val === null) return 'hm-null';
-      const pct = allAvgs.length < 2 ? 0.5
+    function percentileOf(val) {
+      if (val === null) return null;
+      return allAvgs.length < 2 ? 0.5
         : allAvgs.filter(v => v <= val).length / allAvgs.length;
-      if (pct >= 0.80) return 'hm-hot';
-      if (pct >= 0.60) return 'hm-warm';
-      if (pct >= 0.40) return 'hm-mid';
-      if (pct >= 0.20) return 'hm-cool';
-      return 'hm-cold';
+    }
+    // Gradient stops: cold (cheap) → cool → mid → warm → hot (expensive)
+    const GRADIENT_STOPS = [
+      { p: 0.0, c: [96, 212, 240] },   // cold blue
+      { p: 0.25, c: [74, 222, 128] },  // green
+      { p: 0.5, c: [200, 240, 100] },  // accent yellow-green
+      { p: 0.75, c: [251, 146, 60] },  // orange
+      { p: 1.0, c: [248, 113, 113] },  // hot red
+    ];
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function gradientColour(pct) {
+      for (let i = 0; i < GRADIENT_STOPS.length - 1; i++) {
+        const s0 = GRADIENT_STOPS[i], s1 = GRADIENT_STOPS[i + 1];
+        if (pct >= s0.p && pct <= s1.p) {
+          const t = (pct - s0.p) / (s1.p - s0.p);
+          const r = Math.round(lerp(s0.c[0], s1.c[0], t));
+          const g = Math.round(lerp(s0.c[1], s1.c[1], t));
+          const b = Math.round(lerp(s0.c[2], s1.c[2], t));
+          return [r, g, b];
+        }
+      }
+      return GRADIENT_STOPS[GRADIENT_STOPS.length - 1].c;
+    }
+    function textClassFor(rgb) {
+      // Standard relative-luminance check to decide dark vs light text for contrast
+      const lum = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+      return lum > 0.6 ? 'hm-text-dark' : 'hm-text-light';
+    }
+    function cellStyleFor(val) {
+      const pct = percentileOf(val);
+      if (pct === null) return { style: '', textCls: '' };
+      const rgb = gradientColour(pct);
+      const textCls = textClassFor(rgb);
+      return { style: `background-color: rgb(${rgb[0]},${rgb[1]},${rgb[2]});`, textCls };
     }
 
     // Column averages (per month, across all days)
@@ -1283,12 +1687,12 @@
       tbody += `<td class="day-label${isWE ? ' weekend' : ''}">${short}</td>`;
       for (const m of months) {
         const avg = cellAvgs[day][m];
-        const cls = colourClass(avg);
+        const { style, textCls } = cellStyleFor(avg);
         const n = grid[day][m].length;
         const tooltip = avg !== null
           ? `title="${day} in ${m}: ${sym}${avg.toLocaleString()} avg (${n} night${n!==1?'s':''})"` : '';
         tbody += avg !== null
-          ? `<td class="hm-cell ${cls}" ${tooltip}>${sym}${avg.toLocaleString()}</td>`
+          ? `<td class="hm-cell ${textCls}" style="${style}" ${tooltip}>${sym}${avg.toLocaleString()}</td>`
           : `<td class="hm-null">—</td>`;
       }
       // Row average
