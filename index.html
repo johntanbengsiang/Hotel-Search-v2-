@@ -359,12 +359,19 @@
 
     .chart-scroll {
       overflow-x: auto;
+      overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
+      /* Without this the flex/box layout can shrink the SVG down to the
+         visible viewport width instead of letting it overflow and scroll. */
+      width: 100%;
     }
 
     .daily-chart {
       display: block;
-      touch-action: pan-y;
+      flex-shrink: 0;
+      /* Allow the browser's native horizontal swipe-to-scroll gesture on
+         touch devices; pan-y was blocking it entirely. */
+      touch-action: pan-x pan-y;
     }
 
     .daily-chart .bar {
@@ -1486,6 +1493,14 @@
     svg.setAttribute('width', totalW);
     svg.setAttribute('height', totalH);
     svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+    // Force the true pixel width via inline style too — some mobile browsers
+    // will otherwise scale the SVG down to fit the visible viewport because
+    // of the viewBox, which squashes bars and hides later months instead of
+    // making them reachable by horizontal scroll.
+    svg.style.width = totalW + 'px';
+    svg.style.height = totalH + 'px';
+    svg.style.minWidth = totalW + 'px';
+    svg.style.maxWidth = 'none';
 
     const yScale = v => topPad + chartH - (v / yMax) * chartH;
 
@@ -1541,20 +1556,63 @@
       tooltip.style.top = top + 'px';
     }
 
-    function onBarInteract(e) {
-      const target = e.target.closest('.bar');
-      if (!target) return;
+    let touchScrubbing = false;
+
+    function findBarAtPoint(clientX, clientY) {
+      const el = document.elementFromPoint(clientX, clientY);
+      return el && el.closest('.bar');
+    }
+
+    function activateBar(target, clientX, clientY) {
       if (chartActiveBar) chartActiveBar.classList.remove('active');
       target.classList.add('active');
       chartActiveBar = target;
       const idx = parseInt(target.getAttribute('data-idx'), 10);
-      const point = e.touches ? e.touches[0] : e;
-      showTooltip(idx, point.clientX, point.clientY);
-      e.stopPropagation();
+      showTooltip(idx, clientX, clientY);
     }
 
-    svg.onclick = onBarInteract;
-    svg.ontouchstart = onBarInteract;
+    function clearActiveBar() {
+      if (chartActiveBar) { chartActiveBar.classList.remove('active'); chartActiveBar = null; }
+      tooltip.style.display = 'none';
+    }
+
+    // Desktop: hovering/moving the mouse over a bar updates the tooltip live.
+    svg.onmousemove = (e) => {
+      const target = e.target.closest('.bar');
+      if (target) activateBar(target, e.clientX, e.clientY);
+    };
+    svg.onmouseleave = clearActiveBar;
+
+    // Mobile: a touch that starts on a bar begins "scrubbing" — sliding the
+    // finger left/right then moves between bars to preview each price,
+    // without needing to lift and re-tap. A touch that starts on empty space
+    // (axis labels etc.) is left alone so the container's native horizontal
+    // swipe-to-scroll still works normally.
+    svg.ontouchstart = (e) => {
+      const point = e.touches[0];
+      const target = findBarAtPoint(point.clientX, point.clientY);
+      if (target) {
+        touchScrubbing = true;
+        activateBar(target, point.clientX, point.clientY);
+      } else {
+        touchScrubbing = false;
+      }
+    };
+    svg.ontouchmove = (e) => {
+      if (!touchScrubbing) return; // let the browser handle horizontal scroll
+      const point = e.touches[0];
+      const target = findBarAtPoint(point.clientX, point.clientY);
+      if (target) activateBar(target, point.clientX, point.clientY);
+      e.preventDefault(); // stop the page/scroll from also moving while scrubbing
+    };
+    svg.ontouchend = () => { touchScrubbing = false; };
+
+    // Click still works as a fallback/equivalent to a single tap (e.g. mouse
+    // users on touch-enabled laptops, or a tap that doesn't fire as a touch event).
+    svg.onclick = (e) => {
+      const target = e.target.closest('.bar');
+      if (target) activateBar(target, e.clientX, e.clientY);
+    };
   }
 
   // ── Day × Month heatmap ─────────────────────────────────────────────────
@@ -1599,6 +1657,13 @@
         if (avg !== null) allAvgs.push(avg);
       }
     }
+
+    // Omit any month column where every day-of-week row is empty (no price
+    // data for that month at all), so the matrix doesn't waste horizontal
+    // space — and the corresponding sticky-column scroll — on blank columns.
+    const nonEmptyMonths = months.filter(m => DAYS.some(day => cellAvgs[day][m] !== null));
+    months.length = 0;
+    months.push(...nonEmptyMonths);
 
     // Row averages (per day of week, across all months)
     const rowAvg = {};
