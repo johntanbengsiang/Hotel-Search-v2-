@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hotel Rate Scout</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0e0f11" />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0e0f11;
+      --surface: #16181c;
+      --surface2: #1e2026;
+      --border: #2a2d35;
+      --accent: #c8f064;
+      --accent2: #64d4f0;
+      --text: #e8eaf0;
+      --muted: #6b7280;
+      --danger: #f87171;
+      --success: #4ade80;
+      --font-serif: 'DM Serif Display', serif;
+      --font-sans: 'DM Sans', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Background texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: 
+        radial-gradient(ellipse 60% 40% at 80% 10%, rgba(200,240,100,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 50% at 10% 80%, rgba(100,212,240,0.05) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      padding: 48px 0 40px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: flex-end;
+      gap: 20px;
+    }
+
+    .logo-mark {
+      width: 44px;
+      height: 44px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+      margin-bottom: 4px;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    h1 span {
+      color: var(--accent);
+      font-style: italic;
+    }
+
+    .tagline {
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 300;
+      margin-top: 8px;
+      letter-spacing: 0.02em;
+    }
+
+    /* Input Panel */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      margin: 36px 0;
+    }
+
+    .panel-title {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto auto;
+      gap: 16px;
+      align-items: end;
+    }
+
+    @media (max-width: 720px) {
+      .input-grid { grid-template-columns: 1fr; }
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+
+    input[type="text"],
+    input[type="date"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      padding: 12px 16px;
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      width: 100%;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(200,240,100,0.1);
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.6);
+      cursor: pointer;
+    }
+
+    .btn-run {
+      background: var(--accent);
+      color: #0e0f11;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 12px 28px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+
+    .btn-run:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(200,240,100,0.3);
+    }
+
+    .btn-run:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Status bar */
+    .status-bar {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 24px;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    .status-bar.visible { display: flex; }
+    .status-bar.error { border-color: var(--danger); color: var(--danger); }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Stats summary row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 600px) {
+      .stats-row { grid-template-columns: 1fr; }
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+    }
+
+    .stat-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-family: var(--font-serif);
+      font-size: 2rem;
+      line-height: 1;
+      color: var(--accent);
+    }
+
+    .stat-value.blue { color: var(--accent2); }
+    .stat-value.white { color: var(--text); }
+
+    .stat-sub {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* Monthly table */
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: 1.4rem;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .section-title span {
+      color: var(--accent);
+      font-style: italic;
+    }
+
+    .monthly-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 36px;
+    }
+
+    .month-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      transition: border-color 0.2s;
+    }
+
+    .month-card:hover { border-color: var(--accent); }
+
+    .month-name {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .month-avg {
+      font-family: var(--font-serif);
+      font-size: 1.8rem;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .month-range {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* Full data table */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 48px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    thead tr {
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      padding: 14px 20px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(42,45,53,0.6);
+      transition: background 0.12s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface); }
+
+    td {
+      padding: 12px 20px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+
+    td.price { color: var(--accent); font-weight: 500; }
+    td.price-null { color: var(--muted); }
+    td.weekend { color: var(--accent2); }
+
+    /* Price heat bar */
+    .price-bar {
+      display: inline-block;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--accent);
+      opacity: 0.6;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+
+    /* Month separator in table */
+    tr.month-sep td {
+      background: var(--surface2);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      padding: 8px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Export button */
+    .btn-export {
+      background: transparent;
+      color: var(--accent2);
+      border: 1px solid var(--accent2);
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      padding: 8px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-bottom: 20px;
+    }
+
+    .btn-export:hover { background: rgba(100,212,240,0.08); }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    /* Note banner */
+    .note {
+      background: rgba(200,240,100,0.06);
+      border: 1px solid rgba(200,240,100,0.2);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .note strong { color: var(--accent); }
+
+    #results { display: none; }
+
+    /* ── Day × Month heatmap ─────────────────────────────────────── */
+    .heatmap-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 48px;
+    }
+
+    .heatmap-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .heatmap-table th {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 12px 10px;
+      text-align: center;
+      white-space: nowrap;
+      background: var(--surface2);
+    }
+
+    .heatmap-table th.day-header {
+      text-align: left;
+      padding-left: 20px;
+      min-width: 60px;
+    }
+
+    .heatmap-table td {
+      padding: 10px 8px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      border-bottom: 1px solid rgba(42,45,53,0.5);
+      border-right: 1px solid rgba(42,45,53,0.4);
+      transition: background 0.12s;
+      white-space: nowrap;
+      min-width: 80px;
+    }
+
+    .heatmap-table td.day-label {
+      text-align: left;
+      padding-left: 20px;
+      color: var(--muted);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      background: var(--surface2);
+      border-right: 1px solid var(--border);
+      min-width: 60px;
+    }
+
+    .heatmap-table td.day-label.weekend { color: var(--accent2); }
+
+    .heatmap-table td:last-child { border-right: none; }
+    .heatmap-table tr:last-child td { border-bottom: none; }
+    .heatmap-table tbody tr:hover td:not(.day-label) { background: var(--surface); }
+
+    .hm-cell { color: var(--accent); font-weight: 500; cursor: default; }
+    .hm-null  { color: rgba(107,114,128,0.4); }
+    .hm-hot   { color: #f87171; }   /* top ~20% prices */
+    .hm-warm  { color: #fb923c; }   /* top 20-40% */
+    .hm-mid   { color: var(--accent); }  /* middle */
+    .hm-cool  { color: #4ade80; }   /* bottom 20-40% */
+    .hm-cold  { color: #60d4f0; }   /* bottom ~20% prices */
+
+    .hm-avg-row td {
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 0.7rem;
+      border-top: 1px solid var(--border);
+    }
+    .hm-avg-row td.avg-val { color: var(--accent2); font-weight: 500; }
+
+    /* Row average column in heatmap */
+    .heatmap-table td.row-avg-val {
+      background: var(--surface2);
+      color: var(--accent2);
+      font-weight: 500;
+      border-left: 1px solid var(--border);
+      font-size: 0.75rem;
+    }
+    .heatmap-table th.row-avg-header {
+      background: var(--surface2);
+      border-left: 1px solid var(--border);
+      color: var(--accent2);
+      font-size: 0.6rem;
+    }
+    .heatmap-table td.corner-avg {
+      background: var(--surface2);
+      color: var(--accent);
+      font-weight: 600;
+      border-left: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+    }
+
+    /* FX conversion row */
+    .fx-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 16px;
+      padding: 14px 18px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      flex-wrap: wrap;
+    }
+    .fx-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .fx-toggle input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .fx-toggle span {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+    .fx-fields {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .fx-fields input[type="text"],
+    .fx-fields input[type="number"] {
+      width: auto;
+    }
+    .fx-sep {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+    .fx-badge {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--accent);
+      background: rgba(200,240,100,0.08);
+      border: 1px solid rgba(200,240,100,0.2);
+      border-radius: 6px;
+      padding: 3px 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="header-inner">
+      <div class="logo-mark">🏨</div>
+      <div>
+        <h1>Hotel Rate <span>Scout</span></h1>
+        <p class="tagline">Pull nightly rates from Google Hotels across any date range</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Input Panel -->
+  <div class="panel" style="margin-top: 36px;">
+    <div class="panel-title">// Search parameters</div>
+    <div class="input-grid">
+      <div class="field">
+        <label>Hotel Name</label>
+        <input type="text" id="hotel" placeholder="e.g. Marina Bay Sands Singapore" value="Marina Bay Sands Singapore" oninput="onHotelInput()" />
+      </div>
+      <div class="field">
+        <label>Start Date</label>
+        <input type="date" id="startDate" oninput="onDateChange()" />
+      </div>
+      <div class="field" style="min-width:140px;">
+        <label>Duration</label>
+        <select id="monthCount" onchange="onMonthChange()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:11px 12px;font-size:0.9rem;font-family:var(--font-sans);width:100%;cursor:pointer;">
+          <option value="custom">Custom dates</option>
+          <option value="1">1 month</option>
+          <option value="2">2 months</option>
+          <option value="3" selected>3 months</option>
+          <option value="6">6 months</option>
+          <option value="9">9 months</option>
+          <option value="12">12 months</option>
+        </select>
+      </div>
+      <div class="field" style="min-width:140px;display:none;" id="endDateField">
+        <label>End Date</label>
+        <input type="date" id="endDate" oninput="onDateChange()" />
+      </div>
+      <div class="field" style="min-width:100px;">
+        <label>Guests</label>
+        <select id="guestsCount" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:11px 12px;font-size:0.9rem;font-family:var(--font-sans);width:100%;cursor:pointer;">
+          <option value="1">1 adult</option>
+          <option value="2" selected>2 adults</option>
+          <option value="3">3 adults</option>
+          <option value="4">4 adults</option>
+        </select>
+      </div>
+      <div class="field" style="min-width:120px;">
+        <label>Range</label>
+        <div id="dayCount" style="font-family:var(--font-mono);font-size:0.82rem;padding:12px 0;color:var(--accent);line-height:1.4;">—</div>
+      </div>
+      <button class="btn-run" id="runBtn" onclick="runScrape()">
+        Run Scout →
+      </button>
+    </div>
+
+    <!-- Currency confirmation banner -->
+    <div id="currencyBanner" style="display:none;margin-top:16px;padding:14px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:none;align-items:center;gap:14px;flex-wrap:wrap;">
+      <span style="font-size:0.85rem;color:var(--muted);">Detected currency:</span>
+      <span id="currencyDisplay" style="font-family:var(--font-mono);color:var(--accent);font-size:0.95rem;font-weight:500;"></span>
+      <span style="font-size:0.82rem;color:var(--muted);">· Not right?</span>
+      <select id="currencyOverride" onchange="onCurrencyOverride()" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.82rem;font-family:var(--font-mono);cursor:pointer;">
+        <option value="">Change currency…</option>
+        <option value="USD,$,us">USD – US Dollar ($)</option>
+        <option value="EUR,€,eu">EUR – Euro (€)</option>
+        <option value="GBP,£,gb">GBP – British Pound (£)</option>
+        <option value="SGD,S$,sg">SGD – Singapore Dollar (S$)</option>
+        <option value="JPY,¥,jp">JPY – Japanese Yen (¥)</option>
+        <option value="AUD,A$,au">AUD – Australian Dollar (A$)</option>
+        <option value="HKD,HK$,hk">HKD – Hong Kong Dollar (HK$)</option>
+        <option value="CAD,CA$,ca">CAD – Canadian Dollar (CA$)</option>
+        <option value="CHF,CHF,ch">CHF – Swiss Franc (CHF)</option>
+        <option value="CNY,¥,cn">CNY – Chinese Yuan (¥)</option>
+        <option value="INR,₹,in">INR – Indian Rupee (₹)</option>
+        <option value="THB,฿,th">THB – Thai Baht (฿)</option>
+        <option value="MYR,RM,my">MYR – Malaysian Ringgit (RM)</option>
+        <option value="IDR,Rp,id">IDR – Indonesian Rupiah (Rp)</option>
+        <option value="AED,AED,ae">AED – UAE Dirham (AED)</option>
+        <option value="KRW,₩,kr">KRW – Korean Won (₩)</option>
+        <option value="TWD,NT$,tw">TWD – Taiwan Dollar (NT$)</option>
+        <option value="VND,₫,vn">VND – Vietnamese Dong (₫)</option>
+        <option value="ZAR,R,za">ZAR – South African Rand (R)</option>
+        <option value="BRL,R$,br">BRL – Brazilian Real (R$)</option>
+        <option value="MXN,MX$,mx">MXN – Mexican Peso (MX$)</option>
+        <option value="NZD,NZ$,nz">NZD – New Zealand Dollar (NZ$)</option>
+        <option value="QAR,QAR,qa">QAR – Qatari Riyal (QAR)</option>
+        <option value="SAR,SAR,sa">SAR – Saudi Riyal (SAR)</option>
+        <option value="MAD,MAD,ma">MAD – Moroccan Dirham (MAD)</option>
+        <option value="PHP,₱,ph">PHP – Philippine Peso (₱)</option>
+      </select>
+    </div>
+
+    <!-- FX Conversion row -->
+    <div class="fx-row">
+      <label class="fx-toggle">
+        <input type="checkbox" id="fxEnabled" onchange="onFxToggle()" />
+        <span>FX Conversion</span>
+      </label>
+      <div class="fx-fields" id="fxFields" style="display:none;">
+        <span class="fx-sep">Convert all prices → </span>
+        <div class="field" style="min-width:80px;">
+          <input type="text" id="fxTargetSymbol" placeholder="¥" value="¥" style="width:60px;padding:8px 10px;text-align:center;" title="Display symbol" />
+        </div>
+        <div class="field" style="min-width:100px;">
+          <input type="text" id="fxTargetLabel" placeholder="JPY" value="JPY" style="width:80px;padding:8px 10px;text-align:center;font-family:var(--font-mono);" title="Currency label" />
+        </div>
+        <span class="fx-sep">at rate</span>
+        <span class="fx-sep" id="fxSourceLabel" style="color:var(--accent);font-family:var(--font-mono);">1 USD</span>
+        <span class="fx-sep">=</span>
+        <div class="field" style="min-width:100px;">
+          <input type="number" id="fxRate" placeholder="155.00" value="155" min="0.0001" step="any" style="width:100px;padding:8px 10px;" title="FX rate (units of target per 1 source)" />
+        </div>
+        <span id="fxTargetLabelBadge" class="fx-badge">JPY</span>
+      </div>
+      <span id="fxOffNote" style="font-size:0.78rem;color:var(--muted);">Off — prices displayed in scraped currency</span>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar" id="statusBar">
+    <div class="spinner" id="spinner"></div>
+    <span id="statusText">Connecting to Google Hotels…</span>
+  </div>
+
+  <!-- Note -->
+  <div class="note" id="noteBox" style="display:none;">
+    <strong>How it works:</strong> The browser launches once (~15s) to authenticate and find the hotel, 
+    then fetches prices via Google's internal API — <strong>one call per month, ~1 second each</strong>. 
+    A full year takes about 25 seconds total. Prices shown in the detected local currency. 
+    Check the debug log if prices are missing.
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <div class="stats-row" id="statsRow"></div>
+
+    <div class="results-header">
+      <h2 class="section-title">Monthly <span>Averages</span></h2>
+      <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
+
+    <div class="monthly-grid" id="monthlyGrid"></div>
+
+    <h2 class="section-title" style="margin-bottom:16px;">Day-of-Week <span>Price Matrix</span></h2>
+    <div class="heatmap-wrap">
+      <div id="heatmapTable"></div>
+    </div>
+
+    <h2 class="section-title" style="margin-bottom:16px;">Full <span>Night-by-Night</span> Rates</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Day</th>
+            <th id="rateHeader">Rate / night</th>
+            <th>vs Monthly Avg</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- Debug log -->
+  <div id="debugPanel" style="display:none; margin-bottom:48px;">
+    <h2 class="section-title" style="margin-bottom:12px;">Scraper <span>Debug Log</span></h2>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;">
+      <pre id="debugLog" style="font-family:var(--font-mono);font-size:0.75rem;color:var(--muted);white-space:pre-wrap;line-height:1.7;"></pre>
+    </div>
+  </div>
+
+  <!-- Raw API Inspector -->
+  <div style="margin-bottom:48px;">
+    <h2 class="section-title" style="margin-bottom:8px;">API <span>Inspector</span></h2>
+    <p style="color:var(--muted);font-size:0.82rem;margin-bottom:16px;">Dumps the raw batchexecute response structure to verify price field indices. Uses the same hotel/currency/guests as the search panel above.</p>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+      <div class="field" style="min-width:80px;">
+        <label>Year</label>
+        <input type="number" id="dumpYear" value="2026" style="width:90px;padding:10px 12px;" />
+      </div>
+      <div class="field" style="min-width:80px;">
+        <label>Month (1–12)</label>
+        <input type="number" id="dumpMonth" value="7" min="1" max="12" style="width:80px;padding:10px 12px;" />
+      </div>
+      <button class="btn-export" style="margin-bottom:0;margin-top:22px;" onclick="runDumpRaw()">⚙ Dump Raw Structure</button>
+      <span id="dumpStatus" style="font-family:var(--font-mono);font-size:0.78rem;color:var(--muted);"></span>
+    </div>
+    <div id="dumpOutput" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;overflow-x:auto;">
+      <pre id="dumpLog" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--muted);white-space:pre-wrap;line-height:1.6;"></pre>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── Currency detection ──────────────────────────────────────────────────
+  const COUNTRY_CURRENCY = [
+    [["singapore"," sg ","sentosa"],          "sg","SGD","S$"],
+    [["thailand","bangkok","phuket","pattaya","chiang mai","koh "], "th","THB","฿"],
+    [["bali","jakarta","indonesia","lombok"],  "id","IDR","Rp"],
+    [["malaysia","kuala lumpur","penang","langkawi"," kl "], "my","MYR","RM"],
+    [["vietnam","ho chi minh","hanoi","hoi an","da nang"], "vn","VND","₫"],
+    [["philippines","manila","cebu","palawan","boracay"], "ph","PHP","₱"],
+    [["japan","tokyo","osaka","kyoto","hiroshima","hokkaido"], "jp","JPY","¥"],
+    [["hong kong","hk "],                     "hk","HKD","HK$"],
+    [["taiwan","taipei"],                     "tw","TWD","NT$"],
+    [["korea","seoul","busan","jeju"],        "kr","KRW","₩"],
+    [["china","beijing","shanghai","shenzhen","guangzhou"], "cn","CNY","¥"],
+    [["london","england","scotland","wales","uk ","united kingdom","britain"], "gb","GBP","£"],
+    [["paris","france","nice","lyon","marseille","bordeaux"], "fr","EUR","€"],
+    [["germany","berlin","munich","frankfurt","hamburg"], "de","EUR","€"],
+    [["italy","rome","milan","venice","florence","naples"], "it","EUR","€"],
+    [["spain","barcelona","madrid","seville","ibiza","mallorca"], "es","EUR","€"],
+    [["amsterdam","netherlands"],             "nl","EUR","€"],
+    [["switzerland","zurich","geneva","bern","lucerne"], "ch","CHF","CHF"],
+    [["portugal","lisbon","porto","algarve"], "pt","EUR","€"],
+    [["greece","athens","santorini","mykonos","crete"], "gr","EUR","€"],
+    [["new york","los angeles","chicago","miami","las vegas","san francisco","hawaii","boston","washington","usa","united states"], "us","USD","$"],
+    [["canada","toronto","vancouver","montreal","calgary"], "ca","CAD","CA$"],
+    [["mexico","cancun","cabo","playa del carmen","tulum"], "mx","MXN","MX$"],
+    [["brazil","sao paulo","rio de janeiro"],  "br","BRL","R$"],
+    [["dubai","abu dhabi","uae","emirates"],   "ae","AED","AED"],
+    [["qatar","doha"],                         "qa","QAR","QAR"],
+    [["saudi","riyadh","jeddah"],              "sa","SAR","SAR"],
+    [["india","mumbai","delhi","bangalore","goa","chennai"], "in","INR","₹"],
+    [["maldives"],                             "mv","USD","$"],
+    [["australia","sydney","melbourne","brisbane","perth","queensland"], "au","AUD","A$"],
+    [["new zealand","auckland","queenstown","christchurch"], "nz","NZD","NZ$"],
+    [["south africa","cape town","johannesburg"], "za","ZAR","R"],
+    [["morocco","marrakech","casablanca"],     "ma","MAD","MAD"],
+  ];
+
+  let detectedCurrency = { gl: "us", currency: "USD", symbol: "$" };
+  let confirmedCurrency = null; // set after user sees banner
+
+  function detectCurrency(hotelName) {
+    const lower = hotelName.toLowerCase();
+    for (const [keywords, gl, currency, symbol] of COUNTRY_CURRENCY) {
+      if (keywords.some(k => lower.includes(k))) return { gl, currency, symbol };
+    }
+    return { gl: "us", currency: "USD", symbol: "$" };
+  }
+
+  function showCurrencyBanner(currency) {
+    const banner = document.getElementById('currencyBanner');
+    document.getElementById('currencyDisplay').textContent =
+      `${currency.currency} (${currency.symbol}) · ${currency.gl.toUpperCase()} pricing`;
+    document.getElementById('currencyOverride').value = '';
+    banner.style.display = 'flex';
+  }
+
+  function onHotelInput() {
+    const hotel = document.getElementById('hotel').value.trim();
+    if (hotel.length < 4) return;
+    detectedCurrency = detectCurrency(hotel);
+    confirmedCurrency = detectedCurrency;
+    showCurrencyBanner(detectedCurrency);
+  }
+
+  function onCurrencyOverride() {
+    const val = document.getElementById('currencyOverride').value;
+    if (!val) return;
+    const [currency, symbol, gl] = val.split(',');
+    confirmedCurrency = { currency, symbol, gl };
+    document.getElementById('currencyDisplay').textContent =
+      `${currency} (${symbol}) · ${gl.toUpperCase()} pricing`;
+  }
+
+  // ── Date / month helpers ─────────────────────────────────────────────────
+  const today = new Date();
+
+  // ── Date helpers (timezone-safe) ────────────────────────────────────────
+  // Always work with YYYY-MM-DD strings to avoid UTC vs local timezone issues.
+  // Never pass date strings directly to `new Date()` — it parses as UTC midnight
+  // which shifts the displayed date by -1 day in UTC+ timezones (e.g. Singapore).
+
+  function toDateStr(d) {
+    // d is a local Date object → return YYYY-MM-DD in LOCAL time
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function parseDateStr(s) {
+    // Parse YYYY-MM-DD as LOCAL date (not UTC)
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function addMonths(dateStr, n) {
+    // Add n months to a YYYY-MM-DD string, returns YYYY-MM-DD string
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const result = new Date(y, m - 1 + n, d);
+    // If day overflowed (e.g. Jan 31 + 1 month = Mar 3 not Feb 31),
+    // clamp to last day of target month
+    if (result.getMonth() !== ((m - 1 + n) % 12 + 12) % 12) {
+      result.setDate(0); // last day of previous month
+    }
+    return toDateStr(result);
+  }
+
+  function onMonthChange() {
+    const val = document.getElementById('monthCount').value;
+    const endField = document.getElementById('endDateField');
+    if (val === 'custom') {
+      endField.style.display = 'block';
+      updateDayCount();
+      return;
+    }
+    endField.style.display = 'none';
+    const startVal = document.getElementById('startDate').value;
+    if (startVal) {
+      document.getElementById('endDate').value = addMonths(startVal, parseInt(val));
+    }
+    updateDayCount();
+  }
+
+  function onDateChange() {
+    const val = document.getElementById('monthCount').value;
+    if (val !== 'custom') {
+      const startVal = document.getElementById('startDate').value;
+      if (startVal) {
+        document.getElementById('endDate').value = addMonths(startVal, parseInt(val));
+      }
+    }
+    updateDayCount();
+  }
+
+  function updateDayCount() {
+    const s = document.getElementById('startDate').value;
+    const e = document.getElementById('endDate').value;
+    const el = document.getElementById('dayCount');
+    if (s && e) {
+      const sd = parseDateStr(s);
+      const ed = parseDateStr(e);
+      const days = Math.round((ed - sd) / 86400000);
+      if (days <= 0) {
+        el.textContent = '—'; el.style.color = 'var(--danger)';
+      } else {
+        const fmt = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        el.innerHTML = `${fmt(sd)} → ${fmt(ed)}<br><span style="color:var(--muted);font-size:0.75rem;">${days} nights</span>`;
+        el.style.color = 'var(--accent)';
+      }
+    } else {
+      el.textContent = '—';
+    }
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  const todayStr = toDateStr(today);
+  document.getElementById('startDate').value = todayStr;
+  document.getElementById('endDate').value = addMonths(todayStr, 3);
+  // endDateField already hidden in HTML; JS keeps it consistent
+  document.getElementById('endDateField').style.display = 'none';
+  onHotelInput();
+  updateDayCount();
+
+  let globalData = null;
+
+  // ── FX Conversion ────────────────────────────────────────────────────────
+  function onFxToggle() {
+    const enabled = document.getElementById('fxEnabled').checked;
+    document.getElementById('fxFields').style.display = enabled ? 'flex' : 'none';
+    document.getElementById('fxOffNote').style.display = enabled ? 'none' : 'inline';
+    updateFxSourceLabel();
+  }
+
+  function updateFxSourceLabel() {
+    // Show the source currency label (scraped currency) in the FX row
+    const currency = confirmedCurrency || detectedCurrency;
+    const el = document.getElementById('fxSourceLabel');
+    if (el) el.textContent = `1 ${currency.currency}`;
+    // Also update the target badge
+    const badge = document.getElementById('fxTargetLabelBadge');
+    const targetLabel = document.getElementById('fxTargetLabel');
+    if (badge && targetLabel) badge.textContent = targetLabel.value || 'JPY';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const tl = document.getElementById('fxTargetLabel');
+    const tb = document.getElementById('fxTargetLabelBadge');
+    if (tl && tb) tl.addEventListener('input', () => { tb.textContent = tl.value || '—'; });
+  });
+
+  function getFxConfig() {
+    if (!document.getElementById('fxEnabled').checked) return null;
+    const rate = parseFloat(document.getElementById('fxRate').value);
+    if (!rate || rate <= 0) return null;
+    return {
+      rate,
+      symbol: document.getElementById('fxTargetSymbol').value || '¥',
+      label: document.getElementById('fxTargetLabel').value || 'JPY',
+    };
+  }
+
+  function applyFx(price, fx) {
+    if (price === null || price === undefined) return null;
+    return Math.round(price * fx.rate);
+  }
+
+  function transformDataWithFx(data, fx) {
+    if (!fx) return data;
+    // Deep clone and convert all prices
+    const results = data.results.map(r => ({
+      ...r,
+      price: applyFx(r.price, fx),
+    }));
+    // Recompute stats from converted prices
+    const monthly = {}, allP = [];
+    for (const r of results) {
+      if (r.price === null) continue;
+      monthly[r.month] = monthly[r.month] || [];
+      monthly[r.month].push(r.price);
+      allP.push(r.price);
+    }
+    const stats = {
+      monthly: Object.fromEntries(
+        Object.entries(monthly).map(([m, p]) => [m, {
+          average: Math.round(p.reduce((a,b)=>a+b,0)/p.length),
+          min: Math.min(...p),
+          max: Math.max(...p),
+          count: p.length,
+        }])
+      ),
+      overall_average: allP.length ? Math.round(allP.reduce((a,b)=>a+b,0)/allP.length) : null,
+      total_nights: allP.length,
+    };
+    return { ...data, results, stats, symbol: fx.symbol, currency: fx.label };
+  }
+  // ── Status helpers ───────────────────────────────────────────────────────
+  function setStatus(msg, isError = false) {
+    const bar = document.getElementById('statusBar');
+    bar.className = 'status-bar visible' + (isError ? ' error' : '');
+    document.getElementById('statusText').textContent = msg;
+    document.getElementById('spinner').style.display = isError ? 'none' : 'block';
+  }
+
+  function hideStatus() {
+    document.getElementById('statusBar').className = 'status-bar';
+  }
+
+  // ── Scrape ───────────────────────────────────────────────────────────────
+  async function runScrape() {
+    const hotel     = document.getElementById('hotel').value.trim();
+    const startDate = document.getElementById('startDate').value;
+    const endDate   = document.getElementById('endDate').value;
+    const currency  = confirmedCurrency || detectedCurrency;
+    const guests    = parseInt(document.getElementById('guestsCount').value, 10);
+
+    if (!hotel || !startDate || !endDate) {
+      setStatus('Please fill in all fields.', true); return;
+    }
+    if (new Date(endDate) <= new Date(startDate)) {
+      setStatus('End date must be after start date.', true); return;
+    }
+
+    // Update FX source label to match confirmed currency
+    updateFxSourceLabel();
+
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('noteBox').style.display = 'none';
+    setStatus(`Launching browser for "${hotel}" (${currency.currency}, ${guests} guest${guests !== 1 ? 's' : ''}) — ~15s…`);
+
+    try {
+      const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:5050' : '';
+      const resp = await fetch(apiBase + '/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hotel_name: hotel,
+          start_date: startDate,
+          end_date:   endDate,
+          currency:   currency.currency,
+          gl:         currency.gl,
+          guests:     guests,
+        }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok || data.error) {
+        setStatus('⚠ ' + (data.error || 'Unknown error'), true);
+        document.getElementById('runBtn').disabled = false;
+        return;
+      }
+
+      globalData = { ...data, symbol: currency.symbol, currency: currency.currency, guests };
+      hideStatus();
+
+      // Apply FX conversion if enabled
+      const fx = getFxConfig();
+      const displayData = fx ? transformDataWithFx(globalData, fx) : globalData;
+
+      renderResults(displayData);
+      document.getElementById('noteBox').style.display = 'block';
+    } catch (err) {
+      setStatus('Could not reach the backend. Make sure the server is running.', true);
+    }
+
+    document.getElementById('runBtn').disabled = false;
+  }
+
+  // ── Render results ───────────────────────────────────────────────────────
+  function renderResults(data) {
+    const { results, stats, hotel, symbol, currency } = data;
+    const sym = symbol || '$';
+    const guests = data.guests || 2;
+    const priceResults = results.filter(r => r.price !== null);
+
+    document.getElementById('rateHeader').textContent = `Rate (${currency}/night · ${guests} guest${guests !== 1 ? 's' : ''})`;
+
+    document.getElementById('statsRow').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Overall Avg / Night</div>
+        <div class="stat-value">${stats.overall_average ? sym + stats.overall_average.toLocaleString() : '—'}</div>
+        <div class="stat-sub">across ${stats.total_nights} nights with data</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Cheapest Night</div>
+        <div class="stat-value blue">${priceResults.length ? sym + Math.min(...priceResults.map(r=>r.price)).toLocaleString() : '—'}</div>
+        <div class="stat-sub">${priceResults.length ? priceResults.find(r=>r.price===Math.min(...priceResults.map(x=>x.price))).date : ''}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Most Expensive</div>
+        <div class="stat-value white">${priceResults.length ? sym + Math.max(...priceResults.map(r=>r.price)).toLocaleString() : '—'}</div>
+        <div class="stat-sub">${priceResults.length ? priceResults.find(r=>r.price===Math.max(...priceResults.map(x=>x.price))).date : ''}</div>
+      </div>
+    `;
+
+    const monthlyHtml = Object.entries(stats.monthly).map(([month, m]) => `
+      <div class="month-card">
+        <div class="month-name">${month}</div>
+        <div class="month-avg">${sym}${m.average.toLocaleString()}</div>
+        <div class="month-range">${sym}${m.min.toLocaleString()} – ${sym}${m.max.toLocaleString()} · ${m.count} nights</div>
+      </div>
+    `).join('');
+    document.getElementById('monthlyGrid').innerHTML = monthlyHtml ||
+      '<p style="color:var(--muted);font-size:0.85rem;">No price data returned.</p>';
+
+    const maxPrice = priceResults.length ? Math.max(...priceResults.map(r=>r.price)) : 1;
+    let lastMonth = null;
+    const rows = results.map(r => {
+      let monthSep = '';
+      if (r.month !== lastMonth) {
+        lastMonth = r.month;
+        const ma = stats.monthly[r.month];
+        monthSep = `<tr class="month-sep"><td colspan="4">${r.month}${ma ? ' · avg ' + sym + ma.average.toLocaleString() : ''}</td></tr>`;
+      }
+      const isWeekend = r.day_of_week === 'Sat' || r.day_of_week === 'Sun';
+      const monthAvg = stats.monthly[r.month] ? stats.monthly[r.month].average : null;
+      let vsAvg = '—';
+      if (r.price && monthAvg) {
+        const diff = r.price - monthAvg;
+        vsAvg = (diff >= 0 ? '+' : '') + sym + Math.abs(diff).toFixed(0);
+      }
+      const barWidth = r.price ? Math.round((r.price / maxPrice) * 80) : 0;
+      const priceCell = r.price
+        ? `<td class="price">${sym}${r.price.toLocaleString()}<span class="price-bar" style="width:${barWidth}px"></span></td>`
+        : `<td class="price-null">—</td>`;
+
+      return `${monthSep}<tr>
+        <td>${r.date}</td>
+        <td class="${isWeekend ? 'weekend' : ''}">${r.day_of_week}</td>
+        ${priceCell}
+        <td style="color:var(--muted);font-size:0.78rem;">${vsAvg}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('tableBody').innerHTML = rows;
+
+    // Render heatmap
+    renderHeatmap(results, stats, sym);
+
+    document.getElementById('results').style.display = 'block';
+
+    if (data.debug && data.debug.length) {
+      document.getElementById('debugPanel').style.display = 'block';
+      document.getElementById('debugLog').textContent = data.debug.join('\n');
+    }
+  }
+
+  // ── Day × Month heatmap ─────────────────────────────────────────────────
+  function renderHeatmap(results, stats, sym) {
+    const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    const DAYS_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const WEEKEND = new Set(['Saturday','Sunday']);
+
+    // Collect unique months in order
+    const months = [];
+    const seen = new Set();
+    for (const r of results) {
+      if (!seen.has(r.month)) { seen.add(r.month); months.push(r.month); }
+    }
+
+    // Build lookup: dayName → monthLabel → [prices]
+    const grid = {};
+    for (const day of DAYS) {
+      grid[day] = {};
+      for (const m of months) grid[day][m] = [];
+    }
+
+    const JS_DAY_TO_NAME = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    for (const r of results) {
+      if (r.price === null) continue;
+      const d = new Date(r.date + 'T00:00:00');
+      const dayName = JS_DAY_TO_NAME[d.getDay()];
+      if (grid[dayName] && grid[dayName][r.month] !== undefined) {
+        grid[dayName][r.month].push(r.price);
+      }
+    }
+
+    // Compute cell averages and global price range for colour scale
+    const cellAvgs = {}; // dayName → month → avg|null
+    let allAvgs = [];
+    for (const day of DAYS) {
+      cellAvgs[day] = {};
+      for (const m of months) {
+        const arr = grid[day][m];
+        const avg = arr.length ? Math.round(arr.reduce((a,b) => a+b, 0) / arr.length) : null;
+        cellAvgs[day][m] = avg;
+        if (avg !== null) allAvgs.push(avg);
+      }
+    }
+
+    // Row averages (per day of week, across all months)
+    const rowAvg = {};
+    for (const day of DAYS) {
+      const allPricesForDay = months.flatMap(m => grid[day][m]);
+      rowAvg[day] = allPricesForDay.length
+        ? Math.round(allPricesForDay.reduce((a,b) => a+b, 0) / allPricesForDay.length)
+        : null;
+    }
+
+    // Percentile colour buckets
+    allAvgs.sort((a,b) => a-b);
+    function colourClass(val) {
+      if (val === null) return 'hm-null';
+      const pct = allAvgs.length < 2 ? 0.5
+        : allAvgs.filter(v => v <= val).length / allAvgs.length;
+      if (pct >= 0.80) return 'hm-hot';
+      if (pct >= 0.60) return 'hm-warm';
+      if (pct >= 0.40) return 'hm-mid';
+      if (pct >= 0.20) return 'hm-cool';
+      return 'hm-cold';
+    }
+
+    // Column averages (per month, across all days)
+    const colAvg = {};
+    for (const m of months) {
+      const vals = DAYS.map(d => cellAvgs[d][m]).filter(v => v !== null);
+      colAvg[m] = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+    }
+
+    // Grand average (overall)
+    const allPricesAll = results.filter(r => r.price !== null).map(r => r.price);
+    const grandAvg = allPricesAll.length
+      ? Math.round(allPricesAll.reduce((a,b) => a+b, 0) / allPricesAll.length)
+      : null;
+
+    // Build table HTML
+    const shortMonth = m => {
+      const parts = m.split(' '); // "July 2026"
+      return parts[0].slice(0,3) + '<br><span style="font-size:0.55rem;opacity:0.6">' + parts[1] + '</span>';
+    };
+
+    let thead = '<thead><tr>';
+    thead += '<th class="day-header">Day</th>';
+    for (const m of months) thead += `<th>${shortMonth(m)}</th>`;
+    thead += '<th class="row-avg-header">Avg / Day</th>';
+    thead += '</tr></thead>';
+
+    // Data rows
+    let tbody = '<tbody>';
+    for (let i = 0; i < DAYS.length; i++) {
+      const day = DAYS[i];
+      const short = DAYS_SHORT[i];
+      const isWE = WEEKEND.has(day);
+      tbody += `<tr>`;
+      tbody += `<td class="day-label${isWE ? ' weekend' : ''}">${short}</td>`;
+      for (const m of months) {
+        const avg = cellAvgs[day][m];
+        const cls = colourClass(avg);
+        const n = grid[day][m].length;
+        const tooltip = avg !== null
+          ? `title="${day} in ${m}: ${sym}${avg.toLocaleString()} avg (${n} night${n!==1?'s':''})"` : '';
+        tbody += avg !== null
+          ? `<td class="hm-cell ${cls}" ${tooltip}>${sym}${avg.toLocaleString()}</td>`
+          : `<td class="hm-null">—</td>`;
+      }
+      // Row average
+      const ra = rowAvg[day];
+      tbody += ra !== null
+        ? `<td class="row-avg-val" title="${day} overall avg across all months">${sym}${ra.toLocaleString()}</td>`
+        : `<td class="hm-null" style="border-left:1px solid var(--border);">—</td>`;
+      tbody += '</tr>';
+    }
+
+    // Column average footer row
+    tbody += '<tr class="hm-avg-row">';
+    tbody += '<td class="day-label" style="color:var(--muted);font-size:0.65rem;">Avg / Mo</td>';
+    for (const m of months) {
+      const v = colAvg[m];
+      tbody += v !== null
+        ? `<td class="avg-val">${sym}${v.toLocaleString()}</td>`
+        : '<td class="hm-null">—</td>';
+    }
+    // Corner: grand average
+    tbody += grandAvg !== null
+      ? `<td class="corner-avg" title="Grand average across all days and months">${sym}${grandAvg.toLocaleString()}</td>`
+      : '<td class="hm-null" style="border-left:1px solid var(--border);">—</td>';
+    tbody += '</tr></tbody>';
+
+    document.getElementById('heatmapTable').innerHTML =
+      `<table class="heatmap-table">${thead}${tbody}</table>`;
+  }
+
+  // ── Export CSV ───────────────────────────────────────────────────────────────
+  function exportCSV() {
+    if (!globalData) return;
+    const fx = getFxConfig();
+    const data = fx ? transformDataWithFx(globalData, fx) : globalData;
+    const { results, stats, hotel, symbol, currency } = data;
+    const sym = symbol || '$';
+    let csv = `Hotel,Date,Day,Price (${currency}/night),Month,Monthly Avg\n`;
+    results.forEach(r => {
+      const ma = stats.monthly[r.month] ? stats.monthly[r.month].average : '';
+      csv += `"${hotel}",${r.date},${r.day_of_week},${r.price ?? ''},${r.month},${ma}\n`;
+    });
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+      download: `hotel-rates-${hotel.replace(/\s+/g,'-').toLowerCase()}${fx ? `-${fx.label}` : ''}.csv`
+    });
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ── API Inspector (dump-raw) ─────────────────────────────────────────────
+  async function runDumpRaw() {
+    const hotel    = document.getElementById('hotel').value.trim();
+    const currency = confirmedCurrency || detectedCurrency;
+    const guests   = parseInt(document.getElementById('guestsCount').value, 10);
+    const year     = parseInt(document.getElementById('dumpYear').value, 10);
+    const month    = parseInt(document.getElementById('dumpMonth').value, 10);
+
+    if (!hotel) { alert('Enter a hotel name in the search panel first.'); return; }
+
+    document.getElementById('dumpStatus').textContent = 'Running… (~15s for browser session)';
+    document.getElementById('dumpOutput').style.display = 'none';
+
+    try {
+      const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:5050' : '';
+      const resp = await fetch(apiBase + '/api/dump-raw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hotel_name: hotel,
+          year, month,
+          currency: currency.currency,
+          gl:       currency.gl,
+          guests,
+        }),
+      });
+      const data = await resp.json();
+      document.getElementById('dumpStatus').textContent = 'Done.';
+      document.getElementById('dumpOutput').style.display = 'block';
+      document.getElementById('dumpLog').textContent = JSON.stringify(data, null, 2);
+    } catch (err) {
+      document.getElementById('dumpStatus').textContent = 'Error: ' + err.message;
+    }
+  }
+
+  document.getElementById('hotel').addEventListener('keydown', e => {
+    if (e.key === 'Enter') runScrape();
+  });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('Service Worker registered!'))
+        .catch(err => console.log('Service Worker failed: ', err));
+    });
+  }
+</script>
+  
+</body>
+</html>
