@@ -1567,13 +1567,17 @@
       axisSvg += `<text class="axis-label" x="${leftPad - 6}" y="${y + 3}" text-anchor="end">${sym}${Math.round(val).toLocaleString()}</text>`;
     }
 
-    // Month boundary reference lines + labels along the x-axis
+    // Month boundary reference lines + labels along the x-axis — only for
+    // months that actually have at least one plotted point. priceResults
+    // can include leading/trailing nights with no price data (e.g. a partial
+    // first/last month in the search range), which would otherwise draw an
+    // empty, misleading month label with no line above it.
     let lastMonthLabel = null;
-    priceResults.forEach((r, i) => {
-      if (r.month !== lastMonthLabel) {
-        lastMonthLabel = r.month;
-        const x = xScale(i);
-        const shortLabel = r.month.split(' ')[0].slice(0, 3);
+    pts.forEach(p => {
+      if (p.month !== lastMonthLabel) {
+        lastMonthLabel = p.month;
+        const x = xScale(p.i);
+        const shortLabel = p.month.split(' ')[0].slice(0, 3);
         axisSvg += `<line class="month-band-line" x1="${x}" y1="${topPad}" x2="${x}" y2="${topPad + plotH}" />`;
         axisSvg += `<text class="axis-label" x="${x + 3}" y="${topPad + plotH + 14}">${shortLabel}</text>`;
       }
