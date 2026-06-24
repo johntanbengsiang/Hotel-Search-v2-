@@ -332,56 +332,35 @@
       position: relative;
     }
 
-    .chart-legend {
+    .chart-stats {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px 16px;
+      gap: 8px 20px;
       margin-bottom: 14px;
       font-family: var(--font-mono);
-      font-size: 0.68rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.06em;
       color: var(--muted);
     }
 
-    .chart-legend .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+    .chart-stats .stat-peak { color: #f87171; }
+    .chart-stats .stat-low { color: #4ade80; }
+    .chart-stats b { font-weight: 500; }
 
-    .chart-legend .legend-swatch {
-      width: 10px;
-      height: 10px;
-      border-radius: 3px;
-      flex-shrink: 0;
-    }
-
-    .chart-scroll {
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-      /* Without this the flex/box layout can shrink the SVG down to the
-         visible viewport width instead of letting it overflow and scroll. */
+    /* Fixed to the card's width — fills the available space and scales with
+       the viewport via viewBox, rather than growing wider per data point and
+       requiring horizontal scroll. This keeps the whole trend visible at a
+       glance, which is the point of a line chart over the old bar chart. */
+    .chart-svg-container {
       width: 100%;
     }
 
     .daily-chart {
       display: block;
-      flex-shrink: 0;
-      /* Allow the browser's native horizontal swipe-to-scroll gesture on
-         touch devices; pan-y was blocking it entirely. */
-      touch-action: pan-x pan-y;
-    }
-
-    .daily-chart .bar {
-      cursor: pointer;
-      transition: opacity 0.12s;
-    }
-
-    .daily-chart .bar:hover,
-    .daily-chart .bar.active {
-      opacity: 0.75;
+      width: 100%;
+      height: auto;
+      touch-action: pan-y; /* no horizontal scroll needed any more — chart is fixed width */
     }
 
     .daily-chart .axis-line {
@@ -389,10 +368,64 @@
       stroke-width: 1;
     }
 
+    .daily-chart .month-band-line {
+      stroke: var(--border);
+      stroke-width: 1;
+      stroke-dasharray: 3 3;
+    }
+
     .daily-chart .axis-label {
       fill: var(--muted);
       font-family: var(--font-mono);
       font-size: 9px;
+    }
+
+    .daily-chart .chart-area {
+      fill: var(--accent);
+      opacity: 0.12;
+    }
+
+    .daily-chart .chart-line {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 2;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+    }
+
+    .daily-chart .chart-point {
+      fill: var(--bg);
+      stroke: var(--accent);
+      stroke-width: 1.5;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+
+    .daily-chart .chart-point.active {
+      opacity: 1;
+    }
+
+    .daily-chart .chart-point-peak {
+      fill: #f87171;
+      stroke: var(--surface);
+      stroke-width: 1.5;
+    }
+
+    .daily-chart .chart-point-low {
+      fill: #4ade80;
+      stroke: var(--surface);
+      stroke-width: 1.5;
+    }
+
+    .daily-chart .chart-crosshair {
+      stroke: var(--muted);
+      stroke-width: 1;
+      stroke-dasharray: 2 2;
+      opacity: 0;
+    }
+
+    .daily-chart .chart-crosshair.active {
+      opacity: 0.6;
     }
 
     .chart-tooltip {
@@ -874,8 +907,8 @@
     </div>
 
     <div class="chart-wrap" id="chartWrap">
-      <div class="chart-legend" id="chartLegend"></div>
-      <div class="chart-scroll" id="chartScroll">
+      <div class="chart-stats" id="chartLegend"></div>
+      <div class="chart-svg-container" id="chartScroll">
         <svg id="dailyChart" class="daily-chart"></svg>
       </div>
       <div class="chart-tooltip" id="chartTooltip" style="display:none;"></div>
@@ -1371,8 +1404,10 @@
     `;
 
     // Render daily rates chart (replaces the old monthly-average cards —
-    // that summary is still visible per-row in the table below).
-    renderDailyChart(priceResults, sym);
+    // that summary is still visible per-row in the table below). Pass the
+    // full unfiltered results (including null-price nights) so the chart
+    // can detect and visually break across gaps in the data correctly.
+    renderDailyChart(results, sym);
 
     const maxPrice = priceResults.length ? Math.max(...priceResults.map(r=>r.price)) : 1;
     let lastMonth = null;
@@ -1416,14 +1451,8 @@
     }
   }
 
-  // ── Daily rates chart (bar per night, coloured by month) ────────────────
-  const CHART_MONTH_COLOURS = [
-    '#c8f064', '#64d4f0', '#f0a8e8', '#f5b942', '#7c9cf0',
-    '#4ade80', '#f87171', '#c084fc', '#5eead4', '#fb923c',
-    '#a3e635', '#60a5fa',
-  ];
-
-  let chartActiveBar = null;
+  // ── Daily rates chart (continuous line, fixed width) ────────────────────
+  let chartActivePoint = null;
 
   // Single persistent listener (set up once) to dismiss the tooltip when
   // tapping/clicking outside the chart — avoids re-registering on every render.
@@ -1432,122 +1461,183 @@
     const tooltip = document.getElementById('chartTooltip');
     if (wrap && tooltip && !wrap.contains(e.target)) {
       tooltip.style.display = 'none';
-      if (chartActiveBar) { chartActiveBar.classList.remove('active'); chartActiveBar = null; }
+      if (chartActivePoint) { chartActivePoint.classList.remove('active'); chartActivePoint = null; }
+      const cross = document.getElementById('dailyChart')?.querySelector('.chart-crosshair');
+      if (cross) cross.classList.remove('active');
     }
   });
 
   function renderDailyChart(priceResults, sym) {
     const wrap = document.getElementById('chartWrap');
     const svg = document.getElementById('dailyChart');
-    const legend = document.getElementById('chartLegend');
+    const statsBar = document.getElementById('chartLegend');
     const tooltip = document.getElementById('chartTooltip');
     tooltip.style.display = 'none';
-    chartActiveBar = null;
+    chartActivePoint = null;
 
     if (!priceResults.length) {
-      legend.innerHTML = '';
+      statsBar.innerHTML = '';
       svg.innerHTML = '';
-      svg.setAttribute('width', 0);
-      svg.setAttribute('height', 0);
       let emptyMsg = wrap.querySelector('.chart-empty-msg');
       if (!emptyMsg) {
         emptyMsg = document.createElement('p');
         emptyMsg.className = 'chart-empty-msg';
         emptyMsg.style.cssText = 'color:var(--muted);font-size:0.85rem;padding:8px 2px;';
-        wrap.querySelector('.chart-scroll').appendChild(emptyMsg);
+        wrap.querySelector('.chart-svg-container').appendChild(emptyMsg);
       }
       emptyMsg.textContent = 'No price data returned.';
       emptyMsg.style.display = 'block';
       return;
     }
 
-    // Clear any previous "no data" message now that we have data to show
     const existingEmptyMsg = wrap.querySelector('.chart-empty-msg');
     if (existingEmptyMsg) existingEmptyMsg.style.display = 'none';
 
-    // Assign a colour per month in chronological order of first appearance
-    const months = [];
-    const seenMonths = new Set();
-    for (const r of priceResults) {
-      if (!seenMonths.has(r.month)) { seenMonths.add(r.month); months.push(r.month); }
+    // Only points with a real price are plotted; gaps are NOT interpolated
+    // across, so missing nights show as a visible break rather than a
+    // misleading straight line.
+    const pts = priceResults
+      .map((r, i) => ({ ...r, i }))
+      .filter(r => r.price !== null && r.price !== undefined);
+
+    if (!pts.length) {
+      statsBar.innerHTML = '';
+      svg.innerHTML = '';
+      let emptyMsg = wrap.querySelector('.chart-empty-msg');
+      if (!emptyMsg) {
+        emptyMsg = document.createElement('p');
+        emptyMsg.className = 'chart-empty-msg';
+        emptyMsg.style.cssText = 'color:var(--muted);font-size:0.85rem;padding:8px 2px;';
+        wrap.querySelector('.chart-svg-container').appendChild(emptyMsg);
+      }
+      emptyMsg.textContent = 'No price data returned.';
+      emptyMsg.style.display = 'block';
+      return;
     }
-    const monthColour = {};
-    months.forEach((m, i) => { monthColour[m] = CHART_MONTH_COLOURS[i % CHART_MONTH_COLOURS.length]; });
 
-    // Legend
-    legend.innerHTML = months.map(m =>
-      `<span class="legend-item"><span class="legend-swatch" style="background:${monthColour[m]}"></span>${m}</span>`
-    ).join('');
+    // Peak / low / average for the stats strip and markers
+    const prices = pts.map(p => p.price);
+    const maxPrice = Math.max(...prices);
+    const minPrice = Math.min(...prices);
+    const avgPrice = Math.round(prices.reduce((a,b)=>a+b,0) / prices.length);
+    const peakPt = pts.find(p => p.price === maxPrice);
+    const lowPt = pts.find(p => p.price === minPrice);
 
-    // Layout
-    const barW = 14, gap = 4, leftPad = 44, rightPad = 10, topPad = 14, bottomPad = 22;
-    const chartH = 200;
+    statsBar.innerHTML = `
+      <span class="stat-peak">▲ Peak <b>${sym}${maxPrice.toLocaleString()}</b> · ${peakPt.date}</span>
+      <span class="stat-low">▼ Low <b>${sym}${minPrice.toLocaleString()}</b> · ${lowPt.date}</span>
+      <span>Avg <b>${sym}${avgPrice.toLocaleString()}</b></span>
+    `;
+
+    // Fixed logical canvas size — the chart always fills the card width via
+    // viewBox scaling (preserveAspectRatio="none"), so the number of nights
+    // never changes how wide the chart is and there's no horizontal scroll.
+    const VB_W = 700, VB_H = 260;
+    const leftPad = 50, rightPad = 14, topPad = 18, bottomPad = 28;
+    const plotW = VB_W - leftPad - rightPad;
+    const plotH = VB_H - topPad - bottomPad;
+
     const n = priceResults.length;
-    const innerW = n * (barW + gap);
-    const totalW = leftPad + innerW + rightPad;
-    const totalH = topPad + chartH + bottomPad;
+    const yMax = maxPrice * 1.08;
+    const yMin = Math.min(0, minPrice * 0.95);
+    const xScale = i => n <= 1 ? leftPad + plotW / 2 : leftPad + (i / (n - 1)) * plotW;
+    const yScale = v => topPad + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
 
-    const maxPrice = Math.max(...priceResults.map(r => r.price));
-    const yMax = maxPrice * 1.05;
-
-    svg.setAttribute('width', totalW);
-    svg.setAttribute('height', totalH);
-    svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
-    // Force the true pixel width via inline style too — some mobile browsers
-    // will otherwise scale the SVG down to fit the visible viewport because
-    // of the viewBox, which squashes bars and hides later months instead of
-    // making them reachable by horizontal scroll.
-    svg.style.width = totalW + 'px';
-    svg.style.height = totalH + 'px';
-    svg.style.minWidth = totalW + 'px';
-    svg.style.maxWidth = 'none';
-
-    const yScale = v => topPad + chartH - (v / yMax) * chartH;
+    svg.setAttribute('viewBox', `0 0 ${VB_W} ${VB_H}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+    svg.style.width = '100%';
+    svg.style.display = 'block';
+    // aspect-ratio keeps the chart's proportions correct as it scales to fill
+    // the card width — supported in all modern/2022+ mobile browsers. As a
+    // fallback for older WebViews that ignore it, also set an explicit pixel
+    // height computed from the container's actual rendered width.
+    svg.style.aspectRatio = `${VB_W} / ${VB_H}`;
+    const containerWidth = wrap.querySelector('.chart-svg-container').clientWidth || VB_W;
+    svg.style.height = Math.round((VB_H / VB_W) * containerWidth) + 'px';
 
     // Y-axis gridlines + labels (4 bands)
     let axisSvg = '';
     const ticks = 4;
-    for (let i = 0; i <= ticks; i++) {
-      const val = (yMax / ticks) * i;
+    for (let t = 0; t <= ticks; t++) {
+      const val = yMin + ((yMax - yMin) / ticks) * t;
       const y = yScale(val);
-      axisSvg += `<line class="axis-line" x1="${leftPad}" y1="${y}" x2="${totalW - rightPad}" y2="${y}" />`;
-      axisSvg += `<text class="axis-label" x="${leftPad - 8}" y="${y + 3}" text-anchor="end">${sym}${Math.round(val).toLocaleString()}</text>`;
+      axisSvg += `<line class="axis-line" x1="${leftPad}" y1="${y}" x2="${VB_W - rightPad}" y2="${y}" />`;
+      axisSvg += `<text class="axis-label" x="${leftPad - 6}" y="${y + 3}" text-anchor="end">${sym}${Math.round(val).toLocaleString()}</text>`;
     }
 
-    // Bars — one per night with price data
-    let barsSvg = '';
-    priceResults.forEach((r, i) => {
-      const x = leftPad + i * (barW + gap);
-      const y = yScale(r.price);
-      const h = (topPad + chartH) - y;
-      const colour = monthColour[r.month];
-      barsSvg += `<rect class="bar" data-idx="${i}" x="${x}" y="${y}" width="${barW}" height="${Math.max(h,1)}" rx="2" fill="${colour}" />`;
-    });
-
-    // Month boundary tick labels along x-axis (first day of each visible month)
+    // Month boundary reference lines + labels along the x-axis
     let lastMonthLabel = null;
     priceResults.forEach((r, i) => {
       if (r.month !== lastMonthLabel) {
         lastMonthLabel = r.month;
-        const x = leftPad + i * (barW + gap);
+        const x = xScale(i);
         const shortLabel = r.month.split(' ')[0].slice(0, 3);
-        axisSvg += `<line class="axis-line" x1="${x}" y1="${topPad}" x2="${x}" y2="${topPad + chartH}" />`;
-        axisSvg += `<text class="axis-label" x="${x + 2}" y="${topPad + chartH + 14}">${shortLabel}</text>`;
+        axisSvg += `<line class="month-band-line" x1="${x}" y1="${topPad}" x2="${x}" y2="${topPad + plotH}" />`;
+        axisSvg += `<text class="axis-label" x="${x + 3}" y="${topPad + plotH + 14}">${shortLabel}</text>`;
       }
     });
 
-    svg.innerHTML = axisSvg + barsSvg;
+    // Build the line/area path, breaking into separate segments wherever
+    // there's a gap in the data — detected by calendar date (not array
+    // index) so it's robust even if upstream filtering changes — instead of
+    // interpolating a misleading straight line across missing nights.
+    function daysBetween(d1, d2) {
+      const a = new Date(d1 + 'T00:00:00'), b = new Date(d2 + 'T00:00:00');
+      return Math.round((b - a) / 86400000);
+    }
+    let segments = [[pts[0]]];
+    for (let k = 1; k < pts.length; k++) {
+      if (daysBetween(pts[k-1].date, pts[k].date) === 1) {
+        segments[segments.length - 1].push(pts[k]);
+      } else {
+        segments.push([pts[k]]);
+      }
+    }
 
-    // Tap / click / hover → tooltip with date + rate
-    function showTooltip(idx, clientX, clientY) {
-      const r = priceResults[idx];
-      if (!r) return;
-      tooltip.innerHTML = `<div class="tt-date">${r.date} · ${r.day_of_week}</div><div class="tt-price">${sym}${r.price.toLocaleString()}</div>`;
+    let pathSvg = '';
+    segments.forEach(seg => {
+      const linePath = seg.map((p, idx) =>
+        `${idx === 0 ? 'M' : 'L'}${xScale(p.i).toFixed(1)},${yScale(p.price).toFixed(1)}`
+      ).join(' ');
+      pathSvg += `<path class="chart-line" d="${linePath}" />`;
+
+      if (seg.length > 1) {
+        const areaPath = linePath +
+          ` L${xScale(seg[seg.length-1].i).toFixed(1)},${topPad + plotH}` +
+          ` L${xScale(seg[0].i).toFixed(1)},${topPad + plotH} Z`;
+        pathSvg = `<path class="chart-area" d="${areaPath}" />` + pathSvg;
+      }
+    });
+
+    // Invisible-by-default point markers (shown on hover/scrub) + always-on
+    // peak/low markers so "where prices peak" is visible without interaction.
+    let pointsSvg = '';
+    pts.forEach(p => {
+      const x = xScale(p.i), y = yScale(p.price);
+      let cls = 'chart-point';
+      if (p.price === maxPrice && p.date === peakPt.date) cls += ' chart-point-peak';
+      else if (p.price === minPrice && p.date === lowPt.date) cls += ' chart-point-low';
+      const alwaysVisible = cls !== 'chart-point';
+      pointsSvg += `<circle class="${cls}" data-idx="${p.i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${alwaysVisible ? 4 : 3.5}" style="${alwaysVisible ? 'opacity:1' : ''}" />`;
+    });
+
+    const crosshairSvg = `<line class="chart-crosshair" id="chartCrosshair" x1="0" y1="${topPad}" x2="0" y2="${topPad + plotH}" />`;
+
+    svg.innerHTML = axisSvg + pathSvg + crosshairSvg + pointsSvg;
+
+    // ── Hover / tap / slide interaction ──────────────────────────────────
+    // Rather than requiring a precise hover over the (thin) line itself, we
+    // snap to the nearest data point by x-position — this is the standard,
+    // forgiving interaction model for line charts and works identically for
+    // mouse hover, click, and touch slide-across.
+    function showTooltip(p, clientX, clientY) {
+      tooltip.innerHTML = `<div class="tt-date">${p.date} · ${p.day_of_week}</div><div class="tt-price">${sym}${p.price.toLocaleString()}</div>`;
       tooltip.style.display = 'block';
       const wrapRect = wrap.getBoundingClientRect();
       let left = clientX - wrapRect.left + 10;
       let top = clientY - wrapRect.top - 40;
-      // Keep tooltip inside the card horizontally
       const ttWidth = 140;
       if (left + ttWidth > wrap.clientWidth) left = wrap.clientWidth - ttWidth - 6;
       if (left < 0) left = 6;
@@ -1556,64 +1646,58 @@
       tooltip.style.top = top + 'px';
     }
 
-    let touchScrubbing = false;
-
-    function findBarAtPoint(clientX, clientY) {
-      const el = document.elementFromPoint(clientX, clientY);
-      return el && el.closest('.bar');
+    function nearestPoint(clientX) {
+      const rect = svg.getBoundingClientRect();
+      const relX = ((clientX - rect.left) / rect.width) * VB_W;
+      let best = pts[0], bestDist = Infinity;
+      for (const p of pts) {
+        const d = Math.abs(xScale(p.i) - relX);
+        if (d < bestDist) { bestDist = d; best = p; }
+      }
+      return best;
     }
 
-    function activateBar(target, clientX, clientY) {
-      if (chartActiveBar) chartActiveBar.classList.remove('active');
-      target.classList.add('active');
-      chartActiveBar = target;
-      const idx = parseInt(target.getAttribute('data-idx'), 10);
-      showTooltip(idx, clientX, clientY);
+    function activatePoint(p, clientX, clientY) {
+      if (chartActivePoint) chartActivePoint.classList.remove('active');
+      const circle = svg.querySelector(`circle[data-idx="${p.i}"]`);
+      if (circle) { circle.classList.add('active'); chartActivePoint = circle; }
+      const cross = svg.querySelector('#chartCrosshair');
+      if (cross) {
+        const x = xScale(p.i);
+        cross.setAttribute('x1', x); cross.setAttribute('x2', x);
+        cross.classList.add('active');
+      }
+      showTooltip(p, clientX, clientY);
     }
 
-    function clearActiveBar() {
-      if (chartActiveBar) { chartActiveBar.classList.remove('active'); chartActiveBar = null; }
+    function clearActivePoint() {
+      if (chartActivePoint) { chartActivePoint.classList.remove('active'); chartActivePoint = null; }
+      const cross = svg.querySelector('#chartCrosshair');
+      if (cross) cross.classList.remove('active');
       tooltip.style.display = 'none';
     }
 
-    // Desktop: hovering/moving the mouse over a bar updates the tooltip live.
-    svg.onmousemove = (e) => {
-      const target = e.target.closest('.bar');
-      if (target) activateBar(target, e.clientX, e.clientY);
-    };
-    svg.onmouseleave = clearActiveBar;
+    // Desktop: hovering anywhere over the chart snaps to the nearest point.
+    svg.onmousemove = (e) => activatePoint(nearestPoint(e.clientX), e.clientX, e.clientY);
+    svg.onmouseleave = clearActivePoint;
 
-    // Mobile: a touch that starts on a bar begins "scrubbing" — sliding the
-    // finger left/right then moves between bars to preview each price,
-    // without needing to lift and re-tap. A touch that starts on empty space
-    // (axis labels etc.) is left alone so the container's native horizontal
-    // swipe-to-scroll still works normally.
+    // Mobile: tap or slide a finger across the chart to scrub through
+    // prices — no horizontal scroll to fight with any more since the chart
+    // is fixed-width, so the gesture can always be treated as scrubbing.
     svg.ontouchstart = (e) => {
       const point = e.touches[0];
-      const target = findBarAtPoint(point.clientX, point.clientY);
-      if (target) {
-        touchScrubbing = true;
-        activateBar(target, point.clientX, point.clientY);
-      } else {
-        touchScrubbing = false;
-      }
+      activatePoint(nearestPoint(point.clientX), point.clientX, point.clientY);
     };
     svg.ontouchmove = (e) => {
-      if (!touchScrubbing) return; // let the browser handle horizontal scroll
       const point = e.touches[0];
-      const target = findBarAtPoint(point.clientX, point.clientY);
-      if (target) activateBar(target, point.clientX, point.clientY);
-      e.preventDefault(); // stop the page/scroll from also moving while scrubbing
+      activatePoint(nearestPoint(point.clientX), point.clientX, point.clientY);
+      e.preventDefault();
     };
-    svg.ontouchend = () => { touchScrubbing = false; };
 
-    // Click still works as a fallback/equivalent to a single tap (e.g. mouse
-    // users on touch-enabled laptops, or a tap that doesn't fire as a touch event).
-    svg.onclick = (e) => {
-      const target = e.target.closest('.bar');
-      if (target) activateBar(target, e.clientX, e.clientY);
-    };
+    // Click as a fallback/equivalent to a single tap.
+    svg.onclick = (e) => activatePoint(nearestPoint(e.clientX), e.clientX, e.clientY);
   }
+
 
   // ── Day × Month heatmap ─────────────────────────────────────────────────
   function renderHeatmap(results, stats, sym) {
