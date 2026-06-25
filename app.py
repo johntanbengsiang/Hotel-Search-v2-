@@ -408,6 +408,24 @@ async def get_session(hotel_name, debug, gl="sg", currency="SGD", guests=2):
                 await page.locator('a[href*="/travel/hotels/entity/"]').first.click(timeout=8000)
                 await page.wait_for_timeout(3000)
             except: pass
+        else:
+            # Token search failed — capture what Google actually served so we
+            # can tell a consent wall / "sorry" interstitial / CAPTCHA apart
+            # from a genuine timeout, instead of just logging a bare ✗.
+            try:
+                final_url = page.url
+                title = await page.title()
+                html_now = await page.content()
+                snippet = re.sub(r"\s+", " ", html_now)[:300]
+                debug.append(f"Final URL: {final_url}")
+                debug.append(f"Page title: {title!r}")
+                debug.append(f"Body snippet: {snippet}")
+                if "/sorry/" in final_url or "sorry" in title.lower():
+                    debug.append("→ Google served a bot-check / 'sorry' interstitial, not the real results page. This points to an IP-reputation block, not a code bug.")
+                elif "consent" in final_url.lower():
+                    debug.append("→ Google served a consent page that wasn't dismissed in time.")
+            except Exception as e:
+                debug.append(f"Could not capture failure diagnostics: {e}")
 
         cookies = await context.cookies()
         session["cookies"] = {c["name"]: c["value"] for c in cookies}
