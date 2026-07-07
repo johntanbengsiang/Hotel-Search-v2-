@@ -618,3 +618,13 @@ def health():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
     app.run(debug=False, host="0.0.0.0", port=port)
+
+# ── WIDGET ENDPOINT ─────────────────────────────────────────────
+# This feeds the native Android widget with the single latest headline
+@app.get("/api/latest-headline")
+async def get_latest_headline():
+    # For now, this is a placeholder. 
+    # Later, you can hook this up to your database or RSS parser to grab the actual top news!
+    return JSONResponse(
+        content={"headline": "Breaking: Dispatch Aggregator successfully connected to Android Studio!"}
+    )
