@@ -1,0 +1,23 @@
+name: Keep Hugging Face Space Awake
+
+on:
+  schedule:
+    # Every 30 minutes — far more often than the 48h free-tier sleep
+    # threshold, so the Space never sits idle long enough to sleep.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          STATUS=$(curl -s -o /tmp/resp.txt -w "%{http_code}" \
+            --max-time 25 \
+            https://nhtw-ratescout2.hf.space/health)
+          echo "HTTP status: $STATUS"
+          cat /tmp/resp.txt
+          if [ "$STATUS" -ge 500 ]; then
+            echo "::warning::Space responded with $STATUS - it may have crashed rather than just been asleep."
+          fi
