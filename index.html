@@ -1338,8 +1338,9 @@
     document.getElementById('noteBox').style.display = 'none';
     setStatus(`Launching browser for "${hotel}" (${currency.currency}, ${guests} guest${guests !== 1 ? 's' : ''}) — ~15s…`);
 
+    const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:5050' : '';
+
     try {
-      const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:5050' : '';
       const resp = await fetch(apiBase + '/api/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1353,12 +1354,18 @@
         }),
       });
 
-      const data = await resp.json();
-      if (!resp.ok || data.error) {
-        setStatus('⚠ ' + (data.error || 'Unknown error'), true);
+      const enqueued = await resp.json();
+      if (!resp.ok || enqueued.error) {
+        setStatus('⚠ ' + (enqueued.error || 'Unknown error'), true);
         document.getElementById('runBtn').disabled = false;
         return;
       }
+
+      if (enqueued.ahead_in_queue > 0) {
+        setStatus(`Queued behind ${enqueued.ahead_in_queue} other job(s)…`);
+      }
+
+      const data = await pollJobStatus(apiBase, enqueued.job_id, hotel);
 
       globalData = { ...data, symbol: currency.symbol, currency: currency.currency, guests };
       hideStatus();
@@ -1370,10 +1377,40 @@
       renderResults(displayData);
       document.getElementById('noteBox').style.display = 'block';
     } catch (err) {
-      setStatus('Could not reach the backend. Make sure the server is running.', true);
+      setStatus('⚠ ' + err.message, true);
     }
 
     document.getElementById('runBtn').disabled = false;
+  }
+
+  function pollJobStatus(apiBase, jobId, hotel) {
+    return new Promise((resolve, reject) => {
+      const interval = setInterval(async () => {
+        try {
+          const r = await fetch(apiBase + '/api/status/' + jobId);
+          const job = await r.json();
+          if (!r.ok || job.error) {
+            clearInterval(interval);
+            reject(new Error(job.error || 'Job failed'));
+            return;
+          }
+          if (job.status === 'done') {
+            clearInterval(interval);
+            resolve(job.result);
+            return;
+          }
+          if (job.status === 'error') {
+            clearInterval(interval);
+            reject(new Error(job.error || 'Scrape failed'));
+            return;
+          }
+          setStatus(job.stage || `Working on "${hotel}"…`);
+        } catch (pollErr) {
+          clearInterval(interval);
+          reject(new Error('Lost connection while polling job status.'));
+        }
+      }, 1500);
+    });
   }
 
   // ── Render results ───────────────────────────────────────────────────────

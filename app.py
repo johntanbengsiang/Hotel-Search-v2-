@@ -3,10 +3,19 @@ Google Hotels Price Scraper
 Architecture:
   - /api/test-direct  : tests batchexecute API with known token (no browser needed)
   - /api/test-proxy   : tests if a proxy env var reaches google.com/travel
-  - /api/scrape       : main endpoint
+  - /api/scrape       : queues a scrape job, returns job_id immediately
+  - /api/status/<id>  : poll job status/progress/result
+Concurrency model:
+  A single background worker thread processes scrape jobs one at a time
+  (serialized) so that only one headless browser is ever running at once —
+  this keeps memory usage bounded on small hosts. Request handling itself
+  (enqueue + poll) is instant, so multiple users can queue jobs concurrently
+  without the web server blocking or timing out; they just wait their turn
+  and see live progress instead of a stalled request.
 """
 
 import asyncio, json, re, requests, nest_asyncio
+import threading, queue, uuid, time
 from datetime import datetime, date, timedelta
 from calendar import monthrange
 from flask import Flask, request, jsonify
@@ -20,6 +29,62 @@ app = Flask(__name__)
 CORS(app)
 app.static_folder = "."
 app.static_url_path = ""
+
+# ─── job queue (serializes browser launches, decouples requests from work) ──
+
+JOBS = {}                    # job_id -> dict(status, stage, result, error, ...)
+JOBS_LOCK = threading.Lock()
+JOB_QUEUE = queue.Queue()
+JOB_TTL_SECONDS = 60 * 60     # purge finished jobs after 1 hour
+
+def _update_job(job_id, **kwargs):
+    with JOBS_LOCK:
+        if job_id in JOBS:
+            JOBS[job_id].update(kwargs)
+
+def _purge_old_jobs():
+    cutoff = time.time() - JOB_TTL_SECONDS
+    with JOBS_LOCK:
+        stale = [jid for jid, j in JOBS.items()
+                 if j.get("status") in ("done", "error") and j.get("finished_at", 0) < cutoff]
+        for jid in stale:
+            del JOBS[jid]
+
+def _worker_loop():
+    while True:
+        job_id, payload = JOB_QUEUE.get()
+        try:
+            _update_job(job_id, status="running", stage="Launching browser…")
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                results, debug = loop.run_until_complete(
+                    scrape_prices(
+                        payload["hotel"], payload["start"], payload["end"],
+                        currency=payload["currency"], gl=payload["gl"],
+                        guests=payload["guests"], job_id=job_id,
+                    )
+                )
+            finally:
+                loop.close()
+            _update_job(
+                job_id, status="done", finished_at=time.time(), stage="Done",
+                result={
+                    "hotel": payload["hotel"], "start_date": payload["start"],
+                    "end_date": payload["end"], "guests": payload["guests"],
+                    "results": results, "stats": calc_stats(results), "debug": debug,
+                },
+            )
+        except Exception as ex:
+            import traceback
+            _update_job(job_id, status="error", finished_at=time.time(),
+                        error=str(ex), trace=traceback.format_exc())
+        finally:
+            JOB_QUEUE.task_done()
+            _purge_old_jobs()
+
+_worker_thread = threading.Thread(target=_worker_loop, daemon=True)
+_worker_thread.start()
 
 @app.route("/")
 def index():
@@ -435,31 +500,70 @@ async def get_session(hotel_name, debug, gl="sg", currency="SGD", guests=2):
     return session
 
 
-async def scrape_prices(hotel_name, start_date, end_date, currency="SGD", gl="sg", guests=2):
+async def get_session_with_retry(hotel_name, debug, gl="sg", currency="SGD", guests=2,
+                                  max_attempts=3, job_id=None):
+    session = {"token": None, "cookies": {}, "f_sid": None, "bl": None}
+    for attempt in range(1, max_attempts + 1):
+        if job_id:
+            _update_job(job_id, stage=f"Getting browser session (attempt {attempt}/{max_attempts})…")
+        debug.append(f"--- Session attempt {attempt}/{max_attempts} ---")
+        session = await get_session(hotel_name, debug, gl=gl, currency=currency, guests=guests)
+        if session["token"]:
+            return session
+        if attempt < max_attempts:
+            backoff = 3 * attempt
+            debug.append(f"No token yet - retrying in {backoff}s...")
+            await asyncio.sleep(backoff)
+    return session
+
+
+def batchexecute_with_retry(token, year, month, cookies, f_sid, bl, currency, gl, guests,
+                             debug, max_attempts=3):
+    status, prices = None, {}
+    for attempt in range(1, max_attempts + 1):
+        status, body = batchexecute(token, year, month, cookies, f_sid, bl,
+                                     currency=currency, gl=gl, guests=guests)
+        prices = parse_prices(body)
+        if status == 200 and prices:
+            if attempt > 1:
+                debug.append(f"  {year}-{month:02d}: recovered on attempt {attempt}")
+            return prices, status
+        if attempt < max_attempts:
+            backoff = 2 * attempt
+            debug.append(f"  {year}-{month:02d}: HTTP {status}, {len(prices)} prices "
+                         f"- retrying in {backoff}s (attempt {attempt}/{max_attempts})")
+            time.sleep(backoff)
+    return prices, status
+
+
+async def scrape_prices(hotel_name, start_date, end_date, currency="SGD", gl="sg", guests=2, job_id=None):
     start = datetime.strptime(start_date, "%Y-%m-%d").date()
     end   = datetime.strptime(end_date, "%Y-%m-%d").date()
     debug = []
 
     debug.append(f"Step 1: Getting browser session ({guests} guest{'s' if guests != 1 else ''})...")
-    session = await get_session(hotel_name, debug, gl=gl, currency=currency, guests=guests)
+    session = await get_session_with_retry(hotel_name, debug, gl=gl, currency=currency,
+                                            guests=guests, job_id=job_id)
 
     if not session["token"]:
         return [], debug + [
-            "ERROR: No hotel token found.",
+            "ERROR: No hotel token found after retries.",
             "→ Run /api/test-direct to check if batchexecute works without browser",
             "→ Run /api/test-proxy to check if PROXY_URL env var is working",
             "→ Run /api/test-playwright to diagnose Playwright timing",
         ]
 
-    debug.append(f"Step 2: Fetching prices for {len(months_in_range(start,end))} month(s)...")
+    months = months_in_range(start, end)
+    debug.append(f"Step 2: Fetching prices for {len(months)} month(s)...")
     all_prices = {}
-    for year, month in months_in_range(start, end):
-        status, body = batchexecute(
+    for i, (year, month) in enumerate(months, 1):
+        if job_id:
+            _update_job(job_id, stage=f"Fetching prices: month {i}/{len(months)} ({year}-{month:02d})…")
+        prices, status = batchexecute_with_retry(
             session["token"], year, month,
             session["cookies"], session.get("f_sid"), session.get("bl"),
-            currency=currency, gl=gl, guests=guests
+            currency, gl, guests, debug
         )
-        prices = parse_prices(body)
         debug.append(f"  {year}-{month:02d}: HTTP {status}, {len(prices)} prices")
         all_prices.update(prices)
 
@@ -492,6 +596,7 @@ def calc_stats(results):
 
 @app.route("/api/scrape", methods=["POST"])
 def scrape():
+    # Enqueues a job and returns immediately; poll /api/status/<job_id>.
     data = request.get_json()
     hotel    = (data.get("hotel_name") or "").strip()
     s        = (data.get("start_date") or "").strip()
@@ -510,20 +615,32 @@ def scrape():
     except ValueError:
         return jsonify({"error": "Invalid date format"}), 400
 
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            results, debug = loop.run_until_complete(
-                scrape_prices(hotel, s, e, currency=currency, gl=gl, guests=guests)
-            )
-        finally:
-            loop.close()
-        return jsonify({"hotel":hotel,"start_date":s,"end_date":e,"guests":guests,
-                        "results":results,"stats":calc_stats(results),"debug":debug})
-    except Exception as ex:
-        import traceback
-        return jsonify({"error": str(ex), "trace": traceback.format_exc()}), 500
+    job_id = uuid.uuid4().hex[:12]
+    with JOBS_LOCK:
+        ahead = sum(1 for j in JOBS.values() if j.get("status") in ("queued", "running"))
+        JOBS[job_id] = {"status": "queued", "stage": "Queued...", "created_at": time.time()}
+    JOB_QUEUE.put((job_id, {
+        "hotel": hotel, "start": s, "end": e,
+        "currency": currency, "gl": gl, "guests": guests,
+    }))
+    return jsonify({"job_id": job_id, "status": "queued", "ahead_in_queue": ahead}), 202
+
+
+@app.route("/api/status/<job_id>")
+def job_status(job_id):
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            return jsonify({"error": "job not found (expired or invalid id)"}), 404
+        job = dict(job)
+
+    resp = {"status": job["status"], "stage": job.get("stage")}
+    if job["status"] == "done":
+        resp["result"] = job["result"]
+    elif job["status"] == "error":
+        resp["error"] = job.get("error")
+        resp["trace"] = job.get("trace")
+    return jsonify(resp)
 
 
 @app.route("/api/dump-raw", methods=["POST"])
@@ -611,6 +728,7 @@ async def _dump_session(hotel_name, currency, gl, guests):
 
 
 
+@app.route("/health")
 def health():
     return jsonify({"status":"ok","proxy_configured": bool(os.environ.get("PROXY_URL"))})
 
